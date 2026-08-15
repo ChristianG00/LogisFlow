@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-d+sxi3-##zail$3bs9#tc3cww9o2m67yhrtw^#sp_4yoxryg-w
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['logisflow.alwaysdata.net', 'localhost', '127.0.0.1']
 
 
 # Application definition

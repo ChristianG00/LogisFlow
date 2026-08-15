@@ -5,4 +5,4 @@ env/
 
 # Archivos basura de Python
 __pycache__/
-*.pyc
+*.pycgit init
