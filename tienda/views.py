@@ -4,6 +4,8 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.http import HttpResponse
 from .models import Producto, VarianteProducto, Cliente, Pedido, DetallePedido
 from .forms import CheckoutForm
+import mercadopago
+from django.conf import settings
 
 # ==========================================
 # VISTAS DE LA CLIENTA (CATÁLOGO Y DETALLES)
@@ -123,6 +125,7 @@ def crear_pedido(request):
     if request.method == 'POST':
         form = CheckoutForm(request.POST)
         if form.is_valid():
+            # 1. Guardamos al cliente
             cliente, created = Cliente.objects.get_or_create(
                 rut=form.cleaned_data['rut'],
                 defaults={
@@ -131,12 +134,13 @@ def crear_pedido(request):
                     'direccion': form.cleaned_data['direccion']
                 }
             )
+            # 2. Creamos la orden
             pedido = Pedido.objects.create(
                 cliente=cliente,
                 tipo_entrega=form.cleaned_data['tipo_entrega']
             )
             
-            # 3. Recorre el Carrito y crea los Detalles (bajando stock de la Variante)
+            # 3. Recorremos el carrito y bajamos el stock
             for key, item in carrito.items():
                 variante_obj = VarianteProducto.objects.get(id=item['variante_id'])
                 DetallePedido.objects.create(
@@ -148,8 +152,42 @@ def crear_pedido(request):
                 variante_obj.stock -= item['cantidad']
                 variante_obj.save()
             
+            # --- ¡AQUÍ EMPIEZA LA MAGIA DE MERCADO PAGO! ---
+            
+            # Iniciamos el motor usando la llave que guardaste
+            sdk = mercadopago.SDK(settings.MERCADOPAGO_ACCESS_TOKEN)
+
+            # Transformamos el carrito de Django al formato que pide Mercado Pago
+            items_mp = []
+            for key, item in carrito.items():
+                items_mp.append({
+                    "title": item['nombre'],
+                    "quantity": item['cantidad'],
+                    "unit_price": float(item['precio']),
+                    "currency_id": "CLP"
+                })
+
+            # Configuramos el cobro y las rutas de retorno
+            preference_data = {
+                "items": items_mp,
+                "back_urls": {
+                    "success": request.build_absolute_uri(f"/exito/{pedido.id}/"),
+                    "failure": request.build_absolute_uri("/checkout/"),
+                    "pending": request.build_absolute_uri(f"/exito/{pedido.id}/")
+                },
+                "auto_return": "approved",
+            }
+
+            # Creamos el link de pago seguro
+            preference_response = sdk.preference().create(preference_data)
+            preference = preference_response["response"]
+
+            # Vaciamos el carrito porque la compra ya se armó
             request.session['carrito'] = {}
-            return redirect('pedido_exitoso', pedido_id=pedido.id)
+            
+            # ¡Redirigimos al usuario a pagar!
+            return redirect(preference['init_point'])
+            # -----------------------------------------------
     else:
         form = CheckoutForm()
         
