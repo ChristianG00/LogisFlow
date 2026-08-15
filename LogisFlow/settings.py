@@ -79,7 +79,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'logisflow_logisflowdb',
         'USER': 'logisflow',
-        'PASSWORD': 'TU_CONTRASEÑA_AQUI', 
+        'PASSWORD': 'Carlabnlinda2*', 
         'HOST': 'postgresql-logisflow.alwaysdata.net',
         'PORT': '5432',
     }
