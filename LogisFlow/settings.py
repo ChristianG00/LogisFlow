@@ -128,8 +128,8 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Credenciales de Mercado Pago (Entorno de Pruebas)
-MERCADOPAGO_ACCESS_TOKEN = 'TEST-aqui-pega-tu-access-token-entero'
-MERCADOPAGO_PUBLIC_KEY = 'TEST-aqui-pega-tu-public-key'
+MERCADOPAGO_ACCESS_TOKEN = 'APP_USR-4279563524808664-081509-75bbc46d0a7a0eb0ad67692722343847-2655359138'
+MERCADOPAGO_PUBLIC_KEY = 'APP_USR-e4d0b983-6b60-448a-84a5-5b1e4de94b95'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_REDIRECT_URL = 'dashboard'  # A dónde ir si la clave es correcta
