@@ -6,6 +6,8 @@ from .models import Producto, VarianteProducto, Cliente, Pedido, DetallePedido
 from .forms import CheckoutForm
 import mercadopago
 from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+
 
 # ==========================================
 # VISTAS DE LA CLIENTA (CATÁLOGO Y DETALLES)
@@ -167,16 +169,19 @@ def crear_pedido(request):
                     "currency_id": "CLP"
                 })
 
-            # Configuramos el cobro y las rutas de retorno
+         # Configuramos el cobro forzando las rutas seguras HTTPS y agregando rastreo
             preference_data = {
                 "items": items_mp,
+                "external_reference": str(pedido.id), # <--- EL RASTREADOR (ID de tu Pedido)
                 "back_urls": {
                     "success": f"https://logisflow.alwaysdata.net/exito/{pedido.id}/",
                     "failure": "https://logisflow.alwaysdata.net/checkout/",
                     "pending": f"https://logisflow.alwaysdata.net/exito/{pedido.id}/"
                 },
                 "auto_return": "approved",
+                "notification_url": "https://logisflow.alwaysdata.net/webhook/" # <--- EL TELÉFONO ROJO
             }
+
             # Creamos el link de pago seguro
             preference_response = sdk.preference().create(preference_data)
             preference = preference_response["response"]
@@ -336,3 +341,32 @@ def exportar_excel(request):
         writer.writerow([p.id, fecha_str, p.cliente.nombre, p.cliente.rut, p.estado, p.tipo_entrega, total])
         
     return response
+
+@csrf_exempt
+def webhook_mercadopago(request):
+    # Mercado Pago envía notificaciones por GET y POST
+    topic = request.GET.get("topic") or request.GET.get("type")
+    payment_id = request.GET.get("id") or request.GET.get("data.id")
+
+    # Si es una notificación de pago, la verificamos
+    if topic == "payment" and payment_id:
+        try:
+            sdk = mercadopago.SDK(settings.MERCADOPAGO_ACCESS_TOKEN)
+            payment_info = sdk.payment().get(payment_id)
+            
+            if payment_info["status"] == 200:
+                data = payment_info["response"]
+                estado_pago = data.get("status")
+                # Rescatamos el ID del pedido que enviamos en el Paso 1
+                pedido_id = data.get("external_reference")
+
+                if estado_pago == "approved" and pedido_id:
+                    pedido = Pedido.objects.get(id=pedido_id)
+                    # Cambiamos el estado automáticamente
+                    pedido.estado = 'Preparacion' 
+                    pedido.save()
+        except Exception as e:
+            print(f"Error procesando webhook: {e}")
+            
+    # Siempre debemos responderle a Mercado Pago con un 200 OK rápido
+    return HttpResponse(status=200)

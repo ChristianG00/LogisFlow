@@ -19,6 +19,7 @@ urlpatterns = [
     path('checkout/', views.crear_pedido, name='crear_pedido'), 
     path('exito/<int:pedido_id>/', views.pedido_exitoso, name='pedido_exitoso'),
     path('seguimiento/', views.seguimiento, name='seguimiento'),
+    path('webhook/', views.webhook_mercadopago, name='webhook_mercadopago'),
     
     # Rutas administrativas (Aquí están todas las de la dueña)
     path('dashboard/', views.dashboard, name='dashboard'),
