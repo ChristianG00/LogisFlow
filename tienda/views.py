@@ -171,13 +171,12 @@ def crear_pedido(request):
             preference_data = {
                 "items": items_mp,
                 "back_urls": {
-                    "success": request.build_absolute_uri(f"/exito/{pedido.id}/"),
-                    "failure": request.build_absolute_uri("/checkout/"),
-                    "pending": request.build_absolute_uri(f"/exito/{pedido.id}/")
+                    "success": f"https://logisflow.alwaysdata.net/exito/{pedido.id}/",
+                    "failure": "https://logisflow.alwaysdata.net/checkout/",
+                    "pending": f"https://logisflow.alwaysdata.net/exito/{pedido.id}/"
                 },
                 "auto_return": "approved",
             }
-
             # Creamos el link de pago seguro
             preference_response = sdk.preference().create(preference_data)
             preference = preference_response["response"]
