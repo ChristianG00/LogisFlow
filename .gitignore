@@ -1,0 +1,8 @@
+# Entornos virtuales
+venv/
+env/
+.venv/
+
+# Archivos basura de Python
+__pycache__/
+*.pyc

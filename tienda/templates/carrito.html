@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mi Carrito - LogisFlow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>body { background-color: #f8f9fa; }</style>
+</head>
+<body>
+
+    <nav class="navbar navbar-light bg-white shadow-sm py-3 mb-4">
+        <div class="container d-flex justify-content-between">
+            <a class="navbar-brand text-primary fw-bold" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a>
+            <a href="{% url 'catalogo' %}" class="btn btn-outline-secondary rounded-pill">Seguir Comprando</a>
+        </div>
+    </nav>
+
+    <div class="container mb-5">
+        <h2 class="fw-bold mb-4">Tu Carrito de Compras</h2>
+        
+        <div class="row">
+            <div class="col-lg-8 mb-4">
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body p-4">
+                        {% if carrito %}
+                            <div class="table-responsive">
+                                <table class="table align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th>Precio</th>
+                                            <th>Cantidad</th>
+                                            <th>Subtotal</th>
+                                            <th class="text-end">Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for key, item in carrito.items %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ item.nombre }}</strong><br>
+                                                <small class="text-muted">SKU: {{ item.sku }}</small>
+                                            </td>
+                                            <td>${{ item.precio }}</td>
+                                            
+                                            <!-- Columna de Cantidad con Botones - y + -->
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <a href="{% url 'restar_carrito' key %}" class="btn btn-sm btn-outline-secondary fw-bold px-2">-</a>
+                                                    <span class="fw-bold fs-6">{{ item.cantidad }}</span>
+                                                    <a href="{% url 'sumar_carrito' key %}" class="btn btn-sm btn-outline-secondary fw-bold px-2">+</a>
+                                                </div>
+                                            </td>
+                                            
+                                            <!-- Subtotal calculado por ítem -->
+                                            <td class="fw-bold text-dark">
+                                                ${% widthratio item.precio 1 item.cantidad %}
+                                            </td>
+                                            
+                                            <!-- Columna de Basurero (Elimina todo el producto) -->
+                                            <td class="text-end">
+                                                <a href="{% url 'eliminar_del_carrito' key %}" class="btn btn-sm btn-danger text-white shadow-sm rounded-3" title="Eliminar del carrito">
+                                                    <i class="bi bi-trash3-fill"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-5">
+                                <i class="bi bi-cart-x text-muted" style="font-size: 4rem;"></i>
+                                <h4 class="mt-3 text-muted">Tu carrito está vacío</h4>
+                                <a href="{% url 'catalogo' %}" class="btn btn-primary mt-3 rounded-pill px-4">Volver a la tienda</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resumen y Pago -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm rounded-4 bg-white">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-4">Resumen del Pedido</h5>
+                        <div class="d-flex justify-content-between mb-3 fs-5">
+                            <span class="fw-bold text-dark">Total a Pagar:</span>
+                            <span class="text-success fw-bold">${{ total }}</span>
+                        </div>
+                        <hr>
+                        {% if carrito %}
+                            <a href="{% url 'crear_pedido' %}" class="btn btn-primary btn-lg w-100 rounded-pill fw-bold shadow-sm">
+                                Ir a Pagar <i class="bi bi-arrow-right ms-2"></i>
+                            </a>
+                        {% else %}
+                            <button class="btn btn-secondary btn-lg w-100 rounded-pill fw-bold" disabled>Carrito Vacío</button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Administración - LogisFlow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f4f6f9; }
+        .kpi-card { border-left: 5px solid; border-radius: 10px; transition: transform 0.2s; }
+        .kpi-card:hover { transform: translateY(-3px); }
+        .img-thumbnail-small { width: 40px; height: 40px; object-fit: cover; border-radius: 5px; }
+        .calc-result { background: #e9ecef; border-radius: 10px; border-left: 5px solid #198754; }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar Admin -->
+    <nav class="navbar navbar-dark bg-dark shadow-sm">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold" href="#"><i class="bi bi-shield-lock me-2"></i>Admin LogisFlow</a>
+            <div>
+                <a href="{% url 'catalogo' %}" class="btn btn-outline-light btn-sm me-2" target="_blank">Ir a la Tienda</a>
+                <form action="{% url 'logout' %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-box-arrow-right"></i> Salir</button>
+                </form>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 py-4">
+        
+        <!-- SECCIÓN 1: SUPER KPIs -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4 col-lg-2">
+                <div class="card kpi-card shadow-sm h-100" style="border-color: #198754;">
+                    <div class="card-body p-3">
+                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem;">Ingresos Validados</h6>
+                        <h4 class="mb-0 text-success fw-bold">${{ ingresos_totales }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-lg-2">
+                <div class="card kpi-card shadow-sm h-100" style="border-color: #6f42c1;">
+                    <div class="card-body p-3">
+                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem;">Ticket Promedio</h6>
+                        <h4 class="mb-0 text-purple fw-bold" style="color:#6f42c1;">${{ ticket_promedio }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-lg-2">
+                <div class="card kpi-card shadow-sm h-100" style="border-color: #0d6efd;">
+                    <div class="card-body p-3">
+                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem;">Total Pedidos</h6>
+                        <h4 class="mb-0 text-primary fw-bold">{{ total_pedidos }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-lg-2">
+                <div class="card kpi-card shadow-sm h-100" style="border-color: #fd7e14;">
+                    <div class="card-body p-3">
+                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem;">Pedidos Pendientes</h6>
+                        <h4 class="mb-0 fw-bold" style="color:#fd7e14;">{{ pedidos_pendientes }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-lg-2">
+                <div class="card kpi-card shadow-sm h-100" style="border-color: #0dcaf0;">
+                    <div class="card-body p-3">
+                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem;">Total Clientes</h6>
+                        <h4 class="mb-0 text-info fw-bold">{{ clientes_totales }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-lg-2">
+                <div class="card kpi-card shadow-sm h-100" style="border-color: #dc3545;">
+                    <div class="card-body p-3">
+                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem;">Stock Crítico</h6>
+                        <h4 class="mb-0 text-danger fw-bold">{{ stock_critico }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 2: Pestañas de Navegación -->
+        <ul class="nav nav-tabs fw-bold mb-3" id="adminTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="pedidos-tab" data-bs-toggle="tab" data-bs-target="#pedidos" type="button" role="tab"><i class="bi bi-truck me-2"></i>Gestión de Pedidos</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="inventario-tab" data-bs-toggle="tab" data-bs-target="#inventario" type="button" role="tab"><i class="bi bi-boxes me-2"></i>Inventario y Tallas</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link text-success" id="cotizador-tab" data-bs-toggle="tab" data-bs-target="#cotizador" type="button" role="tab"><i class="bi bi-calculator me-2"></i>Calculadora de Precios</button>
+            </li>
+        </ul>
+
+        <!-- Contenido de las Pestañas -->
+        <div class="tab-content bg-white p-4 rounded-bottom shadow-sm border border-top-0" id="adminTabsContent">
+            
+            <!-- PESTAÑA 1: PEDIDOS -->
+            <div class="tab-pane fade show active" id="pedidos" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4 class="mb-0">Flujo de Despachos</h4>
+                    <a href="{% url 'exportar_excel' %}" class="btn btn-outline-success fw-bold">
+                        <i class="bi bi-file-earmark-excel-fill me-2"></i>Descargar Excel
+                    </a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>N° Orden</th>
+                                <th>Fecha</th>
+                                <th>Cliente</th>
+                                <th>Tipo Entrega</th>
+                                <th>Estado Actual</th>
+                                <th>Acción / Actualizar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pedido in pedidos %}
+                            <tr>
+                                <td class="fw-bold text-primary">#{{ pedido.id }}</td>
+                                <td>{{ pedido.fecha }}</td>
+                                <td>{{ pedido.cliente.nombre }}<br><small class="text-muted">{{ pedido.cliente.rut }}</small></td>
+                                <td>{{ pedido.tipo_entrega }}</td>
+                                <td>
+                                    {% if pedido.estado == 'Pendiente' %}<span class="badge bg-secondary">Pendiente</span>{% endif %}
+                                    {% if pedido.estado == 'Preparando' %}<span class="badge bg-warning text-dark">Preparando</span>{% endif %}
+                                    {% if pedido.estado == 'En Ruta' %}<span class="badge bg-info text-dark">En Ruta</span>{% endif %}
+                                    {% if pedido.estado == 'Entregado' %}<span class="badge bg-success">Entregado</span>{% endif %}
+                                </td>
+                                <td>
+                                    {% if pedido.estado == 'Entregado' %}
+                                        <span class="text-success fw-bold"><i class="bi bi-check2-all"></i> Ciclo Cerrado</span>
+                                    {% else %}
+                                        <form method="POST" class="d-flex gap-2">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="pedido_id" value="{{ pedido.id }}">
+                                            <select name="estado" class="form-select form-select-sm">
+                                                {% for clave, valor in estados %}
+                                                    <option value="{{ clave }}" {% if pedido.estado == clave %}selected{% endif %}>{{ valor }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="6" class="text-center text-muted py-4">No hay pedidos registrados aún.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PESTAÑA 2: INVENTARIO CON FOTOS Y TALLAS -->
+            <div class="tab-pane fade" id="inventario" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4 class="mb-0">Catálogo de Productos y Tallas</h4>
+                    <button type="button" class="btn btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#modalProducto" onclick="limpiarModalProducto()">
+                        <i class="bi bi-plus-lg me-2"></i>Nuevo Producto
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Foto</th>
+                                <th>Info Producto</th>
+                                <th>Precio</th>
+                                <th>Stock por Talla</th>
+                                <th class="text-end">Opciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prod in productos %}
+                            <tr>
+                                <td>
+                                    {% if prod.imagen %}
+                                        <img src="{{ prod.imagen.url }}" class="img-thumbnail-small" style="width: 50px; height: 50px; object-fit: cover;">
+                                    {% else %}
+                                        <div class="bg-light d-flex align-items-center justify-content-center text-muted" style="width: 50px; height: 50px;"><i class="bi bi-image"></i></div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-dark mb-1">{{ prod.sku }}</span><br>
+                                    <span class="fw-bold">{{ prod.nombre }}</span>
+                                </td>
+                                <td>${{ prod.precio }}</td>
+                                
+                                <!-- SECCIÓN: MUESTRA LAS TALLAS -->
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        {% for variante in prod.variantes.all %}
+                                            <span class="badge {% if variante.stock <= 3 %}bg-danger{% else %}bg-secondary{% endif %}">
+                                                {{ variante.talla }}: {{ variante.stock }}
+                                            </span>
+                                        {% empty %}
+                                            <span class="text-muted small">Sin tallas ingresadas</span>
+                                        {% endfor %}
+                                    </div>
+                                    <!-- Botón para abrir modal y agregar stock a una talla -->
+                                    <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalTalla" onclick="prepararModalTalla('{{ prod.id }}', '{{ prod.nombre|escapejs }}')">
+                                        <i class="bi bi-plus-circle me-1"></i>Gestionar Stock
+                                    </button>
+                                </td>
+
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-primary me-1" 
+                                            onclick="editarProducto('{{ prod.id }}', '{{ prod.sku }}', '{{ prod.nombre|escapejs }}', '{{ prod.precio }}')"
+                                            data-bs-toggle="modal" data-bs-target="#modalProducto">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <a href="{% url 'eliminar_producto' prod.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Estás segura? Se borrarán todas sus tallas también.')">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="text-center text-muted py-4">Inventario vacío. Agrega tu primer producto.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PESTAÑA 3: CALCULADORA DE PRECIOS Y COSTOS -->
+            <div class="tab-pane fade" id="cotizador" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-7">
+                        <h4 class="mb-4">Calculadora de Precio de Venta</h4>
+                        <p class="text-muted">Calcula el precio final de tus productos sumando el costo mayorista, los gastos operativos (bencina) y tu margen de ganancia.</p>
+                        
+                        <form id="formCalculadora">
+                            <div class="row g-3">
+                                
+                                <div class="col-12">
+                                    <label class="form-label fw-bold text-primary"><i class="bi bi-tag-fill me-2"></i>1. Costo Base</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control" id="costo_producto" placeholder="Ej: 5000 (Valor al que compraste la prenda)" min="0" oninput="calcularPrecioVenta()">
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 mt-4">
+                                    <label class="form-label fw-bold text-danger"><i class="bi bi-fuel-pump-fill me-2"></i>2. Gasto en Bencina / Transporte</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control" id="costo_transporte" placeholder="Ej: 1500" value="0" min="0" oninput="calcularPrecioVenta()">
+                                    </div>
+                                    <small class="text-muted">Gasto de ir a buscar el producto.</small>
+                                </div>
+
+                                <div class="col-md-6 mt-4">
+                                    <label class="form-label fw-bold text-danger"><i class="bi bi-box-seam-fill me-2"></i>3. Empaque y Extras</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control" id="costo_empaque" placeholder="Ej: 500" value="0" min="0" oninput="calcularPrecioVenta()">
+                                    </div>
+                                    <small class="text-muted">Bolsas, etiquetas, etc.</small>
+                                </div>
+
+                                <div class="col-12 mt-4">
+                                    <label class="form-label fw-bold text-success"><i class="bi bi-graph-up-arrow me-2"></i>4. Margen de Ganancia Deseado (%)</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="margen_ganancia" placeholder="Ej: 40" value="40" min="0" oninput="calcularPrecioVenta()">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <small class="text-muted">Cuánto porcentaje de ganancia quieres sacarle al costo total.</small>
+                                </div>
+
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="col-md-5 mt-4 mt-md-0">
+                        <div class="calc-result p-4 shadow-sm h-100 d-flex flex-column justify-content-center">
+                            <h5 class="fw-bold mb-4"><i class="bi bi-cash-coin me-2"></i>Análisis de Precio</h5>
+                            
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Valor Producto:</span>
+                                <span class="fw-bold text-dark" id="res_producto">$0</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Gastos Operativos (Bencina + Empaque):</span>
+                                <span class="fw-bold text-danger" id="res_operativos">+$0</span>
+                            </div>
+                            
+                            <hr>
+                            
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="fw-bold">Costo Total Real:</span>
+                                <span class="fw-bold text-dark fs-5" id="res_costototal">$0</span>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between mb-4">
+                                <span class="text-success fw-bold">Tu Ganancia Neta:</span>
+                                <span class="text-success fw-bold" id="res_ganancia">+$0</span>
+                            </div>
+                            
+                            <div class="p-3 bg-white rounded-3 border text-center">
+                                <span class="d-block mb-1 fw-bold text-muted">PRECIO DE VENTA SUGERIDO</span>
+                                <span class="fs-2 fw-bold text-success" id="res_precioventa">$0</span>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- MODAL 1: CREAR/EDITAR PRODUCTO (SIN CAMPO STOCK) -->
+    <div class="modal fade" id="modalProducto" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="modalTitulo">Agregar Producto</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{% url 'guardar_producto' %}" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <input type="hidden" id="prod_id" name="id">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Subir Fotografía</label>
+                            <input type="file" class="form-control" name="imagen" accept="image/*">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Código SKU</label>
+                            <input type="text" class="form-control" id="prod_sku" name="sku" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Nombre de la Prenda</label>
+                            <input type="text" class="form-control" id="prod_nombre" name="nombre" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Precio Unitario ($)</label>
+                            <input type="number" class="form-control" id="prod_precio" name="precio" min="0" required>
+                        </div>
+                        <div class="alert alert-info py-2 small mb-0">
+                            <i class="bi bi-info-circle me-1"></i>El stock y las tallas se agregan de forma separada después de guardar el producto.
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold">Guardar Producto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: GESTIONAR TALLAS (MODAL VERDE) -->
+    <div class="modal fade" id="modalTalla" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">Gestión de Stock</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{% url 'guardar_talla' %}" method="post">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <input type="hidden" id="talla_prod_id" name="producto_id">
+                        
+                        <p class="mb-3 text-muted fw-bold" id="talla_prod_nombre"></p>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Seleccionar Talla</label>
+                            <select name="talla" class="form-select" required>
+                                <option value="XS">XS (Extra Small)</option>
+                                <option value="S">S (Small)</option>
+                                <option value="M">M (Medium)</option>
+                                <option value="L">L (Large)</option>
+                                <option value="XL">XL (Extra Large)</option>
+                                <option value="XXL">XXL (Doble XL)</option>
+                                <option value="UNICA">Talla Única</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Unidades en Bodega</label>
+                            <input type="number" class="form-control" name="stock" value="0" min="0" required>
+                        </div>
+                        <small class="text-secondary">Si la talla ya existe, este número reemplazará al stock actual.</small>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="submit" class="btn btn-success fw-bold w-100">Actualizar Stock</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Modal de Producto
+        function limpiarModalProducto() {
+            document.getElementById('modalTitulo').innerText = 'Nuevo Producto';
+            document.getElementById('prod_id').value = '';
+            document.getElementById('prod_sku').value = '';
+            document.getElementById('prod_nombre').value = '';
+            document.getElementById('prod_precio').value = '';
+        }
+
+        function editarProducto(id, sku, nombre, precio) {
+            document.getElementById('modalTitulo').innerText = 'Editar Producto';
+            document.getElementById('prod_id').value = id;
+            document.getElementById('prod_sku').value = sku;
+            document.getElementById('prod_nombre').value = nombre;
+            document.getElementById('prod_precio').value = precio;
+        }
+
+        // Lógica para el Modal de Tallas
+        function prepararModalTalla(id, nombre) {
+            document.getElementById('talla_prod_id').value = id;
+            document.getElementById('talla_prod_nombre').innerText = "Prenda: " + nombre;
+        }
+
+        // Lógica Calculadora de Precios
+        function calcularPrecioVenta() {
+            let costoProducto = parseInt(document.getElementById('costo_producto').value) || 0;
+            let costoTransporte = parseInt(document.getElementById('costo_transporte').value) || 0;
+            let costoEmpaque = parseInt(document.getElementById('costo_empaque').value) || 0;
+            let margenPorcentaje = parseFloat(document.getElementById('margen_ganancia').value) || 0;
+
+            let gastosOperativos = costoTransporte + costoEmpaque;
+            let costoTotalReal = costoProducto + gastosOperativos;
+            let gananciaNeta = costoTotalReal * (margenPorcentaje / 100);
+            let precioVenta = costoTotalReal + gananciaNeta;
+
+            document.getElementById('res_producto').innerText = '$' + costoProducto.toLocaleString('es-CL');
+            document.getElementById('res_operativos').innerText = '+$' + gastosOperativos.toLocaleString('es-CL');
+            document.getElementById('res_costototal').innerText = '$' + costoTotalReal.toLocaleString('es-CL');
+            document.getElementById('res_ganancia').innerText = '+$' + Math.round(gananciaNeta).toLocaleString('es-CL');
+            document.getElementById('res_precioventa').innerText = '$' + Math.round(precioVenta).toLocaleString('es-CL');
+        }
+    </script>
+</body>
+</html>

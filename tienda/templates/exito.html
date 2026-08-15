@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>¡Pedido Exitoso! - LogisFlow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f8f9fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .success-card { border: none; border-radius: 20px; text-align: center; max-width: 500px; width: 100%; }
+        .icon-box { width: 100px; height: 100px; background-color: #d1e7dd; color: #198754; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 4rem; margin: 0 auto 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="container p-3">
+        <div class="card shadow-lg success-card mx-auto p-5">
+            <div class="icon-box">
+                <i class="bi bi-check-lg"></i>
+            </div>
+            
+            <h2 class="fw-bold text-dark mb-2">¡Gracias por tu compra, {{ pedido.cliente.nombre|slice:":15" }}!</h2>
+            <p class="text-muted mb-4">Hemos recibido tu orden correctamente y ya estamos preparándola.</p>
+            
+            <div class="bg-light rounded-4 p-4 mb-4 border">
+                <p class="mb-1 text-muted">Tu número de ticket es:</p>
+                <h1 class="text-primary fw-bold mb-0">#{{ pedido.id }}</h1>
+            </div>
+
+            <p class="small text-muted mb-4">
+                Recuerda que puedes revisar el estado de tu despacho en cualquier momento utilizando tu RUT en la sección de seguimiento.
+            </p>
+
+            <div class="d-grid gap-2">
+                <a href="{% url 'seguimiento' %}" class="btn btn-outline-primary btn-lg rounded-pill fw-bold">Rastrear mi pedido</a>
+                <a href="{% url 'catalogo' %}" class="btn btn-link text-decoration-none text-muted mt-2">Volver a la tienda</a>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
