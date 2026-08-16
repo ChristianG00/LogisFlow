@@ -5,4 +5,7 @@ env/
 
 # Archivos basura de Python
 __pycache__/
-*.pycgit init
+*.pyc
+
+# Variables de entorno y secretos
+.env

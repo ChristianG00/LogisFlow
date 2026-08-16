@@ -11,6 +11,11 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+# Cargar las variables de entorno
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-d+sxi3-##zail$3bs9#tc3cww9o2m67yhrtw^#sp_4yoxryg-w'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -79,7 +84,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'logisflow_logisflowdb',
         'USER': 'logisflow',
-        'PASSWORD': 'Carlabnlinda2*', 
+        'PASSWORD': os.getenv('DB_PASSWORD'), 
         'HOST': 'postgresql-logisflow.alwaysdata.net',
         'PORT': '5432',
     }
@@ -131,9 +136,9 @@ import os
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Credenciales de Mercado Pago (Entorno de Pruebas)
-MERCADOPAGO_ACCESS_TOKEN = 'APP_USR-4279563524808664-081509-75bbc46d0a7a0eb0ad67692722343847-2655359138'
-MERCADOPAGO_PUBLIC_KEY = 'APP_USR-e4d0b983-6b60-448a-84a5-5b1e4de94b95'
+# Credenciales de Mercado Pago (Seguras)
+MERCADOPAGO_ACCESS_TOKEN = os.getenv('MP_ACCESS_TOKEN')
+MERCADOPAGO_PUBLIC_KEY = os.getenv('MP_PUBLIC_KEY')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_REDIRECT_URL = 'dashboard'  # A dónde ir si la clave es correcta
