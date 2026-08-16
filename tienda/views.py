@@ -344,11 +344,9 @@ def exportar_excel(request):
 
 @csrf_exempt
 def webhook_mercadopago(request):
-    # Mercado Pago envía notificaciones por GET y POST
     topic = request.GET.get("topic") or request.GET.get("type")
     payment_id = request.GET.get("id") or request.GET.get("data.id")
 
-    # Si es una notificación de pago, la verificamos
     if topic == "payment" and payment_id:
         try:
             sdk = mercadopago.SDK(settings.MERCADOPAGO_ACCESS_TOKEN)
@@ -357,16 +355,25 @@ def webhook_mercadopago(request):
             if payment_info["status"] == 200:
                 data = payment_info["response"]
                 estado_pago = data.get("status")
-                # Rescatamos el ID del pedido que enviamos en el Paso 1
                 pedido_id = data.get("external_reference")
 
                 if estado_pago == "approved" and pedido_id:
                     pedido = Pedido.objects.get(id=pedido_id)
-                    # Cambiamos el estado automáticamente
-                    pedido.estado = 'Preparacion' 
-                    pedido.save()
+                    
+                    # Verificamos que esté Pendiente para no descontar stock dos veces 
+                    # (Mercado Pago a veces manda el aviso más de una vez)
+                    if pedido.estado == 'Pendiente':
+                        pedido.estado = 'Preparacion' 
+                        pedido.save()
+                        
+                        # --- ¡AQUÍ SE DESCUENTA EL STOCK REAL! ---
+                        detalles = DetallePedido.objects.filter(pedido=pedido)
+                        for detalle in detalles:
+                            variante = detalle.variante
+                            variante.stock -= detalle.cantidad
+                            variante.save()
+                            
         except Exception as e:
             print(f"Error procesando webhook: {e}")
             
-    # Siempre debemos responderle a Mercado Pago con un 200 OK rápido
     return HttpResponse(status=200)
