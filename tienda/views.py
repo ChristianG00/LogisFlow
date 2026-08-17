@@ -9,9 +9,8 @@ from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 
 
-# ==========================================
-# VISTAS DE LA CLIENTA (CATÁLOGO Y DETALLES)
-# ==========================================
+
+# VISTAS DE LA CLIENTA (CATALOGO Y DETALLES)
 
 def catalogo(request):
     query = request.GET.get('q') 
@@ -26,9 +25,7 @@ def producto_detalle(request, producto_id):
     return render(request, 'detalle.html', {'producto': producto})
 
 
-# ==========================================
-# LÓGICA DEL CARRITO DE COMPRAS (CON TALLAS)
-# ==========================================
+# LOGICA DEL CARRITO DE COMPRAS (CON TALLAS)
 
 def agregar_carrito(request, producto_id):
     producto = get_object_or_404(Producto, id=producto_id)
@@ -44,7 +41,7 @@ def agregar_carrito(request, producto_id):
             
         variante = get_object_or_404(VarianteProducto, id=talla_id)
         
-        # Llave única: Ej "5_12" (Producto 5, Variante 12)
+        # Llave única: (Producto 5, Variante 12)
         id_str = f"{producto.id}_{variante.id}"
 
         if id_str in carrito:
@@ -112,10 +109,7 @@ def eliminar_del_carrito(request, producto_id):
     return redirect('ver_carrito')
 
 
-# ==========================================
 # CHECKOUT, ÉXITO Y SEGUIMIENTO
-# ==========================================
-
 def crear_pedido(request):
     carrito = request.session.get('carrito', {})
     
@@ -154,7 +148,7 @@ def crear_pedido(request):
                 variante_obj.stock -= item['cantidad']
                 variante_obj.save()
             
-            # --- ¡AQUÍ EMPIEZA LA MAGIA DE MERCADO PAGO! ---
+            # MERCADO PAGO
             
             # Iniciamos el motor usando la llave que guardaste
             sdk = mercadopago.SDK(settings.MERCADOPAGO_ACCESS_TOKEN)
@@ -172,7 +166,7 @@ def crear_pedido(request):
          # Configuramos el cobro forzando las rutas seguras HTTPS y agregando rastreo
             preference_data = {
                 "items": items_mp,
-                "external_reference": str(pedido.id), # <--- EL RASTREADOR (ID de tu Pedido)
+                "external_reference": str(pedido.id), # EL RASTREADOR (ID de tu Pedido)
                 "back_urls": {
                     "success": f"https://logisflow.alwaysdata.net/exito/{pedido.id}/",
                     "failure": "https://logisflow.alwaysdata.net/checkout/",
@@ -189,7 +183,7 @@ def crear_pedido(request):
             # Vaciamos el carrito porque la compra ya se armó
             request.session['carrito'] = {}
             
-            # ¡Redirigimos al usuario a pagar!
+            # Redirigimos al usuario a pagar
             return redirect(preference['init_point'])
             # -----------------------------------------------
     else:
@@ -219,10 +213,8 @@ def seguimiento(request):
     return render(request, 'seguimiento.html', {'pedido': pedido, 'error': error})
 
 
-# ==========================================
-# VISTAS DE LA DUEÑA (ADMINISTRACIÓN Y KPIs)
-# ==========================================
 
+# VISTAS DE LA DUEÑA
 @staff_member_required(login_url='login')
 def dashboard(request):
     if request.method == 'POST':
@@ -366,7 +358,7 @@ def webhook_mercadopago(request):
                         pedido.estado = 'Preparacion' 
                         pedido.save()
                         
-                        # --- ¡AQUÍ SE DESCUENTA EL STOCK REAL! ---
+                        # SE DESCUENTA EL STOCK REAL
                         detalles = DetallePedido.objects.filter(pedido=pedido)
                         for detalle in detalles:
                             variante = detalle.variante
