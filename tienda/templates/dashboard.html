@@ -52,15 +52,16 @@
             <div class="col-md-4 col-lg-2">
                 <div class="card kpi-card shadow-sm h-100" style="border-color: #0d6efd;">
                     <div class="card-body p-3">
-                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem;">Total Pedidos</h6>
+                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem;">Ventas Cerradas</h6>
                         <h4 class="mb-0 text-primary fw-bold">{{ total_pedidos }}</h4>
                     </div>
                 </div>
             </div>
+            <!-- KPI MODIFICADO: CARRITOS ABANDONADOS -->
             <div class="col-md-4 col-lg-2">
                 <div class="card kpi-card shadow-sm h-100" style="border-color: #fd7e14;">
                     <div class="card-body p-3">
-                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem;">Pedidos Pendientes</h6>
+                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem;">Carritos Abandonados</h6>
                         <h4 class="mb-0 fw-bold" style="color:#fd7e14;">{{ pedidos_pendientes }}</h4>
                     </div>
                 </div>
@@ -89,6 +90,9 @@
                 <button class="nav-link active" id="pedidos-tab" data-bs-toggle="tab" data-bs-target="#pedidos" type="button" role="tab"><i class="bi bi-truck me-2"></i>Gestión de Pedidos</button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link text-warning" id="abandonos-tab" data-bs-toggle="tab" data-bs-target="#abandonos" type="button" role="tab"><i class="bi bi-cart-x me-2"></i>Carritos Abandonados</button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="inventario-tab" data-bs-toggle="tab" data-bs-target="#inventario" type="button" role="tab"><i class="bi bi-boxes me-2"></i>Inventario y Tallas</button>
             </li>
             <li class="nav-item" role="presentation">
@@ -99,7 +103,7 @@
         <!-- Contenido de las Pestañas -->
         <div class="tab-content bg-white p-4 rounded-bottom shadow-sm border border-top-0" id="adminTabsContent">
             
-            <!-- PESTAÑA 1: PEDIDOS -->
+            <!-- PESTAÑA 1: PEDIDOS REALES (PAGADOS) -->
             <div class="tab-pane fade show active" id="pedidos" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h4 class="mb-0">Flujo de Despachos</h4>
@@ -127,7 +131,6 @@
                                 <td>{{ pedido.cliente.nombre }}<br><small class="text-muted">{{ pedido.cliente.rut }}</small></td>
                                 <td>{{ pedido.tipo_entrega }}</td>
                                 <td>
-                                    {% if pedido.estado == 'Pendiente' %}<span class="badge bg-secondary">Pendiente</span>{% endif %}
                                     {% if pedido.estado == 'Preparando' %}<span class="badge bg-warning text-dark">Preparando</span>{% endif %}
                                     {% if pedido.estado == 'En Ruta' %}<span class="badge bg-info text-dark">En Ruta</span>{% endif %}
                                     {% if pedido.estado == 'Entregado' %}<span class="badge bg-success">Entregado</span>{% endif %}
@@ -141,7 +144,9 @@
                                             <input type="hidden" name="pedido_id" value="{{ pedido.id }}">
                                             <select name="estado" class="form-select form-select-sm">
                                                 {% for clave, valor in estados %}
+                                                    {% if clave != 'Pendiente' %}
                                                     <option value="{{ clave }}" {% if pedido.estado == clave %}selected{% endif %}>{{ valor }}</option>
+                                                    {% endif %}
                                                 {% endfor %}
                                             </select>
                                             <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
@@ -157,7 +162,42 @@
                 </div>
             </div>
 
-            <!-- PESTAÑA 2: INVENTARIO CON FOTOS Y TALLAS -->
+            <!-- PESTAÑA 2: CARRITOS ABANDONADOS -->
+            <div class="tab-pane fade" id="abandonos" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4 class="mb-0 text-warning"><i class="bi bi-cart-x me-2"></i>Intentos de Compra (No pagados)</h4>
+                    <p class="text-muted small mb-0">Estos clientes iniciaron el proceso pero no completaron el pago en Mercado Pago.</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>N° Orden</th>
+                                <th>Fecha del Intento</th>
+                                <th>Cliente (Posible Contacto)</th>
+                                <th>Estado Actual</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ab in abandonados %}
+                            <tr>
+                                <td class="fw-bold text-secondary">#{{ ab.id }}</td>
+                                <td>{{ ab.fecha }}</td>
+                                <td>
+                                    <strong>{{ ab.cliente.nombre }}</strong><br>
+                                    <a href="https://wa.me/56{{ ab.cliente.telefono }}" target="_blank" class="text-success text-decoration-none small"><i class="bi bi-whatsapp"></i> {{ ab.cliente.telefono }}</a>
+                                </td>
+                                <td><span class="badge bg-secondary">Abandonado</span></td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center text-muted py-4">Excelente, no tienes carritos abandonados.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PESTAÑA 3: INVENTARIO CON FOTOS Y TALLAS -->
             <div class="tab-pane fade" id="inventario" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h4 class="mb-0">Catálogo de Productos y Tallas</h4>
@@ -228,7 +268,7 @@
                 </div>
             </div>
 
-            <!-- PESTAÑA 3: CALCULADORA DE PRECIOS Y COSTOS -->
+            <!-- PESTAÑA 4: CALCULADORA DE PRECIOS Y COSTOS -->
             <div class="tab-pane fade" id="cotizador" role="tabpanel">
                 <div class="row">
                     <div class="col-md-7">
@@ -315,7 +355,7 @@
         </div>
     </div>
 
-    <!-- MODAL 1: CREAR/EDITAR PRODUCTO (SIN CAMPO STOCK) -->
+    <!-- MODAL 1: CREAR/EDITAR PRODUCTO -->
     <div class="modal fade" id="modalProducto" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content border-0 shadow">

@@ -130,13 +130,13 @@ def crear_pedido(request):
                     'direccion': form.cleaned_data['direccion']
                 }
             )
-            # 2. Creamos la orden
+            # 2. Creamos la orden en estado 'Pendiente' por defecto
             pedido = Pedido.objects.create(
                 cliente=cliente,
                 tipo_entrega=form.cleaned_data['tipo_entrega']
             )
             
-            # 3. Recorremos el carrito y bajamos el stock
+            # 3. Recorremos el carrito y creamos el detalle (SIN descontar stock)
             for key, item in carrito.items():
                 variante_obj = VarianteProducto.objects.get(id=item['variante_id'])
                 DetallePedido.objects.create(
@@ -145,15 +145,11 @@ def crear_pedido(request):
                     cantidad=item['cantidad'],
                     precio_unitario=item['precio']
                 )
-                variante_obj.stock -= item['cantidad']
-                variante_obj.save()
+                # ELIMINAMOS la línea que restaba el stock aquí
             
             # MERCADO PAGO
-            
-            # Iniciamos el motor usando la llave que guardaste
             sdk = mercadopago.SDK(settings.MERCADOPAGO_ACCESS_TOKEN)
 
-            # Transformamos el carrito de Django al formato que pide Mercado Pago
             items_mp = []
             for key, item in carrito.items():
                 items_mp.append({
@@ -163,29 +159,24 @@ def crear_pedido(request):
                     "currency_id": "CLP"
                 })
 
-         # Configuramos el cobro forzando las rutas seguras HTTPS y agregando rastreo
             preference_data = {
                 "items": items_mp,
-                "external_reference": str(pedido.id), # EL RASTREADOR (ID de tu Pedido)
+                "external_reference": str(pedido.id), 
                 "back_urls": {
                     "success": f"https://logisflow.alwaysdata.net/exito/{pedido.id}/",
                     "failure": "https://logisflow.alwaysdata.net/checkout/",
                     "pending": f"https://logisflow.alwaysdata.net/exito/{pedido.id}/"
                 },
                 "auto_return": "approved",
-                "notification_url": "https://logisflow.alwaysdata.net/webhook/" # <--- EL TELÉFONO ROJO
+                "notification_url": "https://logisflow.alwaysdata.net/webhook/"
             }
 
-            # Creamos el link de pago seguro
             preference_response = sdk.preference().create(preference_data)
             preference = preference_response["response"]
 
-            # Vaciamos el carrito porque la compra ya se armó
-            request.session['carrito'] = {}
+            # ELIMINAMOS el vaciado del carrito aquí. El cliente aún no paga.
             
-            # Redirigimos al usuario a pagar
             return redirect(preference['init_point'])
-            # -----------------------------------------------
     else:
         form = CheckoutForm()
         
@@ -194,6 +185,11 @@ def crear_pedido(request):
 
 def pedido_exitoso(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
+    
+    # ¡Recién aquí vaciamos el carrito porque ya pagó!
+    if 'carrito' in request.session:
+        request.session['carrito'] = {}
+        
     return render(request, 'exito.html', {'pedido': pedido})
 
 
@@ -226,28 +222,38 @@ def dashboard(request):
             pedido.save()
         return redirect('dashboard')
 
-    pedidos = Pedido.objects.all().order_by('-fecha')
+    # CAMBIO AQUÍ: Separamos los pedidos
+    # 'pedidos' ahora SOLO tiene los que ya se pagaron (Preparando, En Ruta, Entregado)
+    pedidos = Pedido.objects.exclude(estado='Pendiente').order_by('-fecha')
+    
+    # 'abandonados' tiene solo los que el cliente no pagó
+    abandonados = Pedido.objects.filter(estado='Pendiente').order_by('-fecha')
+
     productos = Producto.objects.all().order_by('nombre')
     clientes = Cliente.objects.count()
 
-    total_pedidos = pedidos.count()
-    pedidos_pendientes = pedidos.filter(estado='Pendiente').count()
-    # Actualizado: Ahora mide el stock crítico en las tallas
+    # El KPI de total de pedidos solo debería contar ventas reales
+    total_pedidos = pedidos.count() 
+    
+    # KPI de abandonos
+    pedidos_pendientes = abandonados.count()
+    
     stock_critico = VarianteProducto.objects.filter(stock__lte=3).count()
 
     ingresos_totales = 0
     pedidos_pagados = 0
-    for p in pedidos:
-        if p.estado != 'Pendiente':
-            pedidos_pagados += 1
-            detalles = DetallePedido.objects.filter(pedido=p)
-            for d in detalles:
-                ingresos_totales += (d.precio_unitario * d.cantidad) # Actualizado
+    for p in pedidos: # Recorremos solo los reales
+        pedidos_pagados += 1
+        detalles = DetallePedido.objects.filter(pedido=p)
+        for d in detalles:
+            ingresos_totales += (d.precio_unitario * d.cantidad)
                 
     ticket_promedio = int(ingresos_totales / pedidos_pagados) if pedidos_pagados > 0 else 0
 
+    # CAMBIO AQUÍ: Agregamos la variable 'abandonados' al context
     context = {
         'pedidos': pedidos,
+        'abandonados': abandonados, # <--- NUEVO
         'productos': productos,
         'estados': Pedido.ESTADOS,
         'total_pedidos': total_pedidos,
@@ -352,13 +358,12 @@ def webhook_mercadopago(request):
                 if estado_pago == "approved" and pedido_id:
                     pedido = Pedido.objects.get(id=pedido_id)
                     
-                    # Verificamos que esté Pendiente para no descontar stock dos veces 
-                    # (Mercado Pago a veces manda el aviso más de una vez)
                     if pedido.estado == 'Pendiente':
-                        pedido.estado = 'Preparacion' 
+                        # CORRECCIÓN: El estado exacto del modelo es 'Preparando'
+                        pedido.estado = 'Preparando' 
                         pedido.save()
                         
-                        # SE DESCUENTA EL STOCK REAL
+                        # AQUÍ SE DESCUENTA EL STOCK REAL Y DE FORMA DEFINITIVA
                         detalles = DetallePedido.objects.filter(pedido=pedido)
                         for detalle in detalles:
                             variante = detalle.variante
