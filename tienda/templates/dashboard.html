@@ -175,15 +175,15 @@
                                 </td>
                                 <td>{{ pedido.tipo_entrega }}</td>
                                 <td>
-                                    {% if pedido.estado == 'Preparando' %}<span
-                                        class="badge bg-warning text-dark">Preparando</span>{% endif %}
-                                    {% if pedido.estado == 'En Ruta' %}<span class="badge bg-info text-dark">En
-                                        Ruta</span>{% endif %}
-                                    {% if pedido.estado == 'Entregado' %}<span
-                                        class="badge bg-success">Entregado</span>{% endif %}
+                                    {% ifequal pedido.estado 'Preparando' %}<span
+                                        class="badge bg-warning text-dark">Preparando</span>{% endifequal %}
+                                    {% ifequal pedido.estado 'En Ruta' %}<span class="badge bg-info text-dark">En
+                                        Ruta</span>{% endifequal %}
+                                    {% ifequal pedido.estado 'Entregado' %}<span
+                                        class="badge bg-success">Entregado</span>{% endifequal %}
                                 </td>
                                 <td>
-                                    {% if pedido.estado == 'Entregado' %}
+                                    {% ifequal pedido.estado 'Entregado' %}
                                     <span class="text-success fw-bold"><i class="bi bi-check2-all"></i> Ciclo
                                         Cerrado</span>
                                     {% else %}
@@ -192,15 +192,14 @@
                                         <input type="hidden" name="pedido_id" value="{{ pedido.id }}">
                                         <select name="estado" class="form-select form-select-sm">
                                             {% for clave, valor in estados %}
-                                            {% if clave != 'Pendiente' %}
-                                            <option value="{{ clave }}" {% if pedido.estado==clave %}selected{% endif
-                                                %}>{{ valor }}</option>
-                                            {% endif %}
+                                            {% ifnotequal clave 'Pendiente' %}
+                                            <option value="{{ clave }}" {% ifequal pedido.estado clave %}selected{% endifequal %}>{{ valor }}</option>
+                                            {% endifnotequal %}
                                             {% endfor %}
                                         </select>
                                         <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
                                     </form>
-                                    {% endif %}
+                                    {% endifequal %}
                                 </td>
                             </tr>
                             {% empty %}
@@ -308,7 +307,7 @@
                                 </td>
                                 <td class="text-end">
                                     <button class="btn btn-sm btn-outline-primary me-1"
-                                        onclick="editarProducto('{{ prod.id }}', '{{ prod.sku }}', '{{ prod.nombre|escapejs }}', '{{ prod.precio }}', '{{ prod.categoria }}', '{{ prod.color_base }}', '{{ prod.estilo }}', '{{ prod.temporada }}')"
+                                        onclick="editarProducto('{{ prod.id }}', '{{ prod.sku }}', '{{ prod.nombre|escapejs }}', '{{ prod.precio }}', '{{ prod.genero }}', '{{ prod.categoria }}', '{{ prod.color_base }}', '{{ prod.estilo }}', '{{ prod.temporada }}')"
                                         data-bs-toggle="modal" data-bs-target="#modalProducto">
                                         <i class="bi bi-pencil-fill"></i>
                                     </button>
@@ -445,14 +444,24 @@
                         <h6 class="fw-bold text-muted mb-3"><i class="bi bi-cpu me-1"></i> Datos para el Motor
                             Heurístico</h6>
 
-                        <div class="mb-4">
-                            <label class="form-label fw-bold text-primary">Categoría de la Prenda</label>
-                            <select class="form-select border-primary" id="prod_categoria" name="categoria" required>
-                                <option value="SUPERIOR">Parte de Arriba</option>
-                                <option value="INFERIOR">Parte de Abajo</option>
-                                <option value="CALZADO">Calzado</option>
-                                <option value="ACCESORIO">Accesorio</option>
-                            </select>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-primary">Género</label>
+                                <select class="form-select border-primary" id="prod_genero" name="genero" required>
+                                    <option value="M" selected>Mujer</option>
+                                    <option value="U">Unisex / Accesorios</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-primary">Categoría (IA)</label>
+                                <select class="form-select border-primary" id="prod_categoria" name="categoria"
+                                    required>
+                                    <option value="SUPERIOR">Parte de Arriba</option>
+                                    <option value="INFERIOR">Parte de Abajo</option>
+                                    <option value="CALZADO">Calzado</option>
+                                    <option value="ACCESORIO">Accesorio</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div class="row mb-3">
@@ -498,7 +507,7 @@
         </div>
     </div>
 
-    <!-- MODAL 2: GESTIONAR TALLAS -->
+    <!-- MODAL 2: GESTIONAR TALLAS (MODAL VERDE) -->
     <div class="modal fade" id="modalTalla" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-sm">
             <div class="modal-content border-0 shadow">
@@ -545,19 +554,21 @@
             document.getElementById('prod_sku').value = '';
             document.getElementById('prod_nombre').value = '';
             document.getElementById('prod_precio').value = '';
+            document.getElementById('prod_genero').value = 'M';
             document.getElementById('prod_categoria').value = 'SUPERIOR';
             document.getElementById('prod_color').value = 'NEGRO';
             document.getElementById('prod_estilo').value = 'CASUAL';
             document.getElementById('prod_temporada').value = 'ATEMPORAL';
         }
 
-        function editarProducto(id, sku, nombre, precio, categoria, color, estilo, temporada) {
+        function editarProducto(id, sku, nombre, precio, genero, categoria, color, estilo, temporada) {
             document.getElementById('modalTitulo').innerText = 'Editar Producto';
             document.getElementById('prod_id').value = id;
             document.getElementById('prod_sku').value = sku;
             document.getElementById('prod_nombre').value = nombre;
             document.getElementById('prod_precio').value = precio;
 
+            if (genero) document.getElementById('prod_genero').value = genero;
             if (categoria) document.getElementById('prod_categoria').value = categoria;
             if (color) document.getElementById('prod_color').value = color;
             if (estilo) document.getElementById('prod_estilo').value = estilo;
