@@ -1,11 +1,13 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
+from recomendador.views import motor_recomendacion
 
 urlpatterns = [
     # Rutas públicas
     path('', views.catalogo, name='catalogo'),
     path('producto/<int:producto_id>/', views.producto_detalle, name='producto_detalle'),
+    path('recomendador/', motor_recomendacion, name='recomendador'),
     
     
     # Rutas del Carrito

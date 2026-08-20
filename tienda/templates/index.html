@@ -7,7 +7,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
-        /* Ajuste para que el footer siempre quede abajo */
         body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; min-height: 100vh; }
         .content-wrapper { flex: 1; }
         
@@ -19,7 +18,6 @@
         .badge-stock { position: absolute; top: 10px; right: 10px; z-index: 10; }
         .price-tag { font-size: 1.5rem; font-weight: 700; color: #2c3e50; }
         
-        /* Efecto sutil para el link de la dueña */
         .admin-link:hover { opacity: 1 !important; color: white !important; }
     </style>
 </head>
@@ -27,22 +25,30 @@
 
     <div class="content-wrapper">
         
-        <!-- Navegación de la Tienda CON BUSCADOR -->
-        <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm py-3">
-            <div class="container d-flex flex-wrap align-items-center justify-content-between">
-                <a class="navbar-brand text-primary mb-2 mb-lg-0" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a>
+        <!-- Navegación -->
+        <nav class="navbar navbar-expand-md navbar-light bg-white shadow-sm py-3">
+            <div class="container d-flex flex-wrap align-items-center justify-content-between gap-2">
+                
+                <!-- Logo -->
+                <a class="navbar-brand text-primary mb-0" href="{% url 'catalogo' %}">
+                    <i class="bi bi-box-seam me-1"></i>LOGISFLOW
+                </a>
                 
                 <!-- Buscador -->
-                <form class="d-flex mx-auto mb-2 mb-lg-0 col-12 col-lg-5" method="get" action="{% url 'catalogo' %}">
+                <form class="d-flex flex-grow-1 mx-lg-4 order-3 order-md-2 mt-2 mt-md-0" method="get" action="{% url 'catalogo' %}" style="max-width: 500px;">
                     <div class="input-group">
-                        <input type="text" class="form-control rounded-start-pill" name="q" placeholder="Buscar poleras, pantalones..." value="{{ query|default:'' }}">
+                        <input type="text" class="form-control rounded-start-pill" name="q" placeholder="Buscar prendas..." value="{{ query|default:'' }}">
                         <button class="btn btn-dark rounded-end-pill px-4" type="submit"><i class="bi bi-search"></i></button>
                     </div>
                 </form>
 
-                <div class="d-flex gap-2">
+                <!-- Botonera -->
+                <div class="d-flex gap-2 order-2 order-md-3 ms-auto">
+                    <a href="{% url 'recomendador' %}" class="btn btn-warning rounded-pill px-3 fw-bold shadow-sm" title="Asesor de Outfits">
+                        <i class="bi bi-magic"></i> <span class="d-none d-lg-inline ms-1">Asesor de Outfits</span>
+                    </a>
                     <a href="{% url 'ver_carrito' %}" class="btn btn-outline-primary rounded-pill px-3"><i class="bi bi-cart3"></i></a>
-                    <a href="{% url 'seguimiento' %}" class="btn btn-outline-dark rounded-pill px-4"><i class="bi bi-truck me-2"></i>Rastrear Pedido</a>
+                    <a href="{% url 'seguimiento' %}" class="btn btn-outline-dark rounded-pill px-3 d-none d-sm-inline-block"><i class="bi bi-truck me-1"></i>Rastrear</a>
                 </div>
             </div>
         </nav>
@@ -57,7 +63,6 @@
 
         <!-- Catálogo de Productos -->
         <div class="container mb-5">
-            <!-- Mensaje si el usuario buscó algo -->
             {% if query %}
                 <h4 class="mb-4 text-muted">Resultados de búsqueda para: <span class="text-dark fw-bold">"{{ query }}"</span></h4>
             {% endif %}
@@ -67,7 +72,6 @@
                     <div class="col-md-4 col-lg-3">
                         <div class="card product-card h-100 shadow-sm position-relative">
                             
-                            <!-- Etiqueta de Stock Dinámica (ACTUALIZADA) -->
                             {% if producto.stock_total <= 0 %}
                                 <span class="badge bg-danger badge-stock">Agotado</span>
                             {% elif producto.stock_total <= 3 %}
@@ -76,7 +80,6 @@
                                 <span class="badge bg-success badge-stock">En Stock</span>
                             {% endif %}
 
-                            <!-- Imagen Real o Placeholder -->
                             {% if producto.imagen %}
                                 <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}" style="height: 200px; object-fit: cover; width: 100%;">
                             {% else %}
@@ -91,7 +94,6 @@
                                 <div class="mt-auto pt-3">
                                     <p class="price-tag mb-2">${{ producto.precio }}</p>
                                     
-                                    <!-- Botón Principal (ACTUALIZADO PARA TALLAS) -->
                                     {% if producto.stock_total > 0 %}
                                         <a href="{% url 'producto_detalle' producto.id %}" class="btn btn-primary w-100 rounded-pill fw-bold mt-2">
                                             Ver Tallas <i class="bi bi-arrow-right ms-1"></i>
@@ -104,7 +106,6 @@
                         </div>
                     </div>
                 {% empty %}
-                    <!-- Pantalla si no hay productos o si la búsqueda no dio resultados -->
                     <div class="col-12 text-center py-5">
                         <i class="bi bi-search text-muted" style="font-size: 4rem;"></i>
                         <h3 class="mt-3 text-muted">No encontramos productos.</h3>
@@ -116,13 +117,11 @@
 
     </div>
 
-    <!-- Footer con enlace oculto a la vista -->
     <footer class="bg-dark text-white text-center py-4 mt-auto">
         <div class="container">
             <p class="mb-0 fw-bold">© 2026 LogisFlow. Todos los derechos reservados.</p>
             <p class="small text-muted mb-0">Compra segura protegida bajo la Ley de Protección de Datos Personales.</p>
             
-            <!-- Aquí está la puerta secreta de la dueña -->
             <a href="{% url 'login' %}" class="text-secondary text-decoration-none small mt-3 d-inline-block admin-link" style="opacity: 0.5; transition: 0.3s;">
                 <i class="bi bi-shield-lock me-1"></i> Acceso Administrativo
             </a>
