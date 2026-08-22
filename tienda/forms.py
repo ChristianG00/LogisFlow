@@ -2,6 +2,31 @@ import re
 from django import forms
 from django.core.exceptions import ValidationError
 
+from .logistica import ESTACIONES_METRO_CHOICES, datos_estacion_metro
+from .models import Producto, VarianteProducto
+
+
+def normalizar_rut(rut):
+    """Valida el dígito verificador y devuelve el formato canónico 12345678-9."""
+    rut_limpio = re.sub(r'[.\-\s]', '', str(rut)).upper()
+    if not re.fullmatch(r'\d{7,8}[0-9K]', rut_limpio):
+        raise ValueError('El formato del RUT no es válido.')
+
+    cuerpo, dv = rut_limpio[:-1], rut_limpio[-1]
+    if int(cuerpo) == 0:
+        raise ValueError('El RUT no es válido.')
+
+    suma, multiplo = 0, 2
+    for digito in reversed(cuerpo):
+        suma += int(digito) * multiplo
+        multiplo = 2 if multiplo == 7 else multiplo + 1
+    resultado = 11 - (suma % 11)
+    esperado = '0' if resultado == 11 else 'K' if resultado == 10 else str(resultado)
+    if dv != esperado:
+        raise ValueError('El RUT ingresado no existe o es inválido.')
+    return f'{cuerpo}-{dv}'
+
+
 class CheckoutForm(forms.Form):
     rut = forms.CharField(
         max_length=12, 
@@ -19,24 +44,30 @@ class CheckoutForm(forms.Form):
     # Hemos separado los tipos de entrega estratégicamente
     ENTREGA_CHOICES = [
         ('', '--- Selecciona un método ---'),
-        ('Retiro', 'Retiro en Domicilio del Vendedor'),
-        ('Metro', 'Entrega en Estación de Metro'),
-        ('Delivery', 'Despacho a Domicilio (Starken/Chilexpress)'),
+        ('Retiro', 'Retiro por el cliente en domicilio del vendedor'),
+        ('Metro', 'Entrega personal en estación de Metro'),
+        ('Delivery', 'Despacho a domicilio por empresa de transporte'),
     ]
     tipo_entrega = forms.ChoiceField(
         choices=ENTREGA_CHOICES, 
         widget=forms.Select(attrs={'class': 'form-select', 'id': 'selector_entrega'})
     )
+
+    estacion_metro = forms.ChoiceField(
+        choices=[('', '--- Selecciona una estación ---')] + ESTACIONES_METRO_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'selector_estacion_metro'}),
+    )
     
     direccion = forms.CharField(
         max_length=200, 
-        required=False, # Ahora es falso, porque si elige "Metro" no necesita dirección
+        required=False,
         widget=forms.TextInput(attrs={'class': 'form-control', 'id': 'campo_direccion', 'placeholder': 'Ej: Estación Tobalaba o Calle Falsa 123'})
     )
 
     aceptar_terminos = forms.BooleanField(
         required=True,
-        label="Acepto el tratamiento de mis datos personales según la Ley N° 19.628.",
+        label="Acepto que mis datos se usen solo para gestionar la compra, el despacho y el seguimiento.",
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
 
@@ -45,60 +76,81 @@ class CheckoutForm(forms.Form):
     # ==========================================
 
     def clean_rut(self):
-        rut = self.cleaned_data.get('rut', '')
-        # 1. Limpiar puntos y guiones
-        rut_limpio = rut.replace('.', '').replace('-', '').upper()
-        
-        # 2. Validar formato con Expresión Regular
-        if not re.match(r'^\d{7,8}[0-9K]$', rut_limpio):
-            raise ValidationError("El formato del RUT no es válido.")
-
-        # 3. Algoritmo Módulo 11 (Matemática real del Registro Civil)
-        cuerpo = rut_limpio[:-1]
-        dv = rut_limpio[-1]
-        
-        suma = 0
-        multiplo = 2
-        
-        for c in reversed(cuerpo):
-            suma += int(c) * multiplo
-            multiplo += 1
-            if multiplo == 8:
-                multiplo = 2
-                
-        esperado = 11 - (suma % 11)
-        
-        if esperado == 11:
-            dv_esperado = '0'
-        elif esperado == 10:
-            dv_esperado = 'K'
-        else:
-            dv_esperado = str(esperado)
-            
-        if dv != dv_esperado:
-            raise ValidationError("El RUT ingresado no existe o es inválido.")
-            
-        # Si pasa todas las pruebas, retorna el RUT formateado bonito
-        return f"{cuerpo}-{dv}"
+        try:
+            return normalizar_rut(self.cleaned_data.get('rut', ''))
+        except ValueError as error:
+            raise ValidationError(str(error))
 
     def clean_telefono(self):
-        telefono = self.cleaned_data.get('telefono', '')
-        # Eliminar espacios o el +56
-        tel_limpio = telefono.replace(' ', '').replace('+56', '')
-        
-        # Un celular chileno válido tiene 9 dígitos y empieza con 9
-        if not re.match(r'^9\d{8}$', tel_limpio):
-            raise ValidationError("Ingresa un celular válido de 9 dígitos (Ej: 912345678).")
+        telefono = self.cleaned_data.get('telefono', '').strip()
+        # Permite escribir 912345678, 56912345678 o +56 9 1234 5678.
+        tel_limpio = re.sub(r'[\s()-]', '', telefono)
+        coincidencia = re.fullmatch(r'(?:\+?56)?(9\d{8})', tel_limpio)
+        if not coincidencia:
+            raise ValidationError("Ingresa un celular chileno válido de 9 dígitos (Ej: 912345678).")
             
-        return f"+56 {tel_limpio}"
+        return f"+56 {coincidencia.group(1)}"
+
+    def clean_nombre(self):
+        nombre = ' '.join(self.cleaned_data['nombre'].split())
+        if len(nombre) < 3:
+            raise ValidationError("Ingresa tu nombre completo.")
+        return nombre
 
     def clean(self):
         cleaned_data = super().clean()
         tipo_entrega = cleaned_data.get('tipo_entrega')
-        direccion = cleaned_data.get('direccion')
+        direccion = ' '.join((cleaned_data.get('direccion') or '').split())
+        estacion_metro = cleaned_data.get('estacion_metro')
 
-        # Validación cruzada: Si elige Metro o Delivery, DEBE escribir algo en el campo
-        if tipo_entrega in ['Metro', 'Delivery'] and not direccion:
-            self.add_error('direccion', 'Debes especificar la estación de Metro o la dirección de envío.')
+        # La dirección se determina en el servidor, nunca solo en JavaScript.
+        if tipo_entrega == 'Retiro':
+            cleaned_data['direccion'] = 'Retiro en domicilio (La Granja)'
+            return cleaned_data
+
+        if tipo_entrega == 'Metro':
+            if not estacion_metro:
+                self.add_error('estacion_metro', 'Selecciona la estación de Metro para coordinar la entrega.')
+            else:
+                try:
+                    estacion = datos_estacion_metro(estacion_metro)
+                    cleaned_data['direccion'] = f"Metro: {estacion['nombre']} ({estacion['linea']})"
+                except ValueError as error:
+                    self.add_error('estacion_metro', str(error))
+            return cleaned_data
+
+        if tipo_entrega == 'Delivery' and not direccion:
+            self.add_error('direccion', 'Debes ingresar la dirección de envío.')
+        elif tipo_entrega == 'Delivery':
+            if len(direccion) < 4:
+                self.add_error('direccion', 'Ingresa una dirección más específica.')
+            else:
+                cleaned_data['direccion'] = direccion
             
         return cleaned_data
+
+
+class ProductoForm(forms.ModelForm):
+    """Valida el inventario antes de guardarlo; no confía en los campos HTML."""
+
+    class Meta:
+        model = Producto
+        fields = ['nombre', 'precio', 'imagen', 'categoria', 'color_base', 'estilo', 'temporada']
+
+    def clean_nombre(self):
+        nombre = ' '.join(self.cleaned_data['nombre'].split())
+        if len(nombre) < 2:
+            raise ValidationError('El nombre del producto es demasiado corto.')
+        return nombre
+
+    def clean_precio(self):
+        precio = self.cleaned_data['precio']
+        if precio < 1:
+            raise ValidationError('El precio debe ser mayor que cero.')
+        return precio
+
+
+class TallaForm(forms.Form):
+    producto_id = forms.IntegerField(min_value=1)
+    talla = forms.ChoiceField(choices=VarianteProducto.TALLAS_CHOICES)
+    stock = forms.IntegerField(min_value=0, max_value=100000)

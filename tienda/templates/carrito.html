@@ -2,106 +2,101 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Mi Carrito - LogisFlow</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi carrito · LogisFlow</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <style>body { background-color: #f8f9fa; }</style>
+    <style>
+        :root { --ink: #34233d; --brand: #b4487a; --muted: #7b7085; }
+        body { min-height: 100vh; color: var(--ink); background: radial-gradient(circle at top right, #fbe2ee 0, transparent 32rem), #fcf7fa; }
+        .cart-nav { background: rgba(255,255,255,.88); border-bottom: 1px solid #e6eaf1; backdrop-filter: blur(12px); }
+        .cart-shell { max-width: 1140px; }
+        .eyebrow { color: var(--brand); font-size: .75rem; font-weight: 800; letter-spacing: .1em; }
+        .cart-card, .summary-card { border: 0; border-radius: 22px; box-shadow: 0 14px 42px rgba(28,48,83,.09); }
+        .cart-card { background: white; overflow: hidden; }
+        .cart-card-header { border-bottom: 1px solid #edf0f5; }
+        .cart-item { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto auto; align-items: center; gap: 1.1rem; padding: 1.25rem 0; }
+        .cart-item + .cart-item { border-top: 1px solid #edf0f5; }
+        .item-image, .item-placeholder { width: 72px; height: 86px; border-radius: 14px; object-fit: cover; background: #eef2f8; }
+        .item-placeholder { color: #93a0b6; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+        .item-name { font-size: 1rem; font-weight: 750; line-height: 1.2; }
+        .item-meta { color: var(--muted); font-size: .78rem; }
+        .quantity-control { display: inline-flex; align-items: center; border: 1px solid #dfe5ee; border-radius: 12px; overflow: hidden; background: #fff; }
+        .quantity-control button { width: 34px; height: 34px; border: 0; background: #f6f8fb; color: var(--ink); font-weight: 800; }
+        .quantity-control button:hover { background: #fff0f6; color: var(--brand); }
+        .quantity-control span { width: 32px; text-align: center; font-weight: 750; }
+        .item-price-label { display: block; color: #8792a5; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+        .remove-button { width: 36px; height: 36px; border: 1px solid #f1d5da; border-radius: 11px; color: #c53e53; background: #fff7f8; }
+        .remove-button:hover { background: #ffe8eb; }
+        .summary-card { position: relative; background: var(--ink); color: white; overflow: hidden; }
+        .summary-card::before { content: ''; display: block; height: 5px; background: linear-gradient(90deg, #f4a6c4, #c58ae5); }
+        .summary-card .muted { color: #afbbce; }
+        .cart-expiry { border: 1px solid rgba(123,229,194,.32); background: rgba(65,216,171,.09); border-radius: 14px; }
+        .pay-button { min-height: 56px; border-radius: 14px; box-shadow: 0 10px 20px rgba(36,107,253,.25); }
+        .step-list { display: flex; gap: .5rem; align-items: center; color: #8591a5; font-size: .78rem; font-weight: 700; }
+        .step-list .active { color: var(--brand); }
+        .step-dot { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: #fbe6ef; color: var(--brand); }
+        .empty-state { padding: 4.5rem 1.5rem; text-align: center; }
+        .empty-icon { width: 84px; height: 84px; margin: 0 auto 1.25rem; display: flex; align-items: center; justify-content: center; border-radius: 24px; color: var(--brand); background: #fbe6ef; font-size: 2.4rem; }
+        .text-primary { color: var(--brand) !important; }
+        .btn-primary { --bs-btn-bg: #b4487a; --bs-btn-border-color: #b4487a; --bs-btn-hover-bg: #93365f; --bs-btn-hover-border-color: #93365f; }
+        @media (max-width: 767px) {
+            .cart-item { grid-template-columns: 64px minmax(0, 1fr) auto; gap: .75rem; }
+            .item-image, .item-placeholder { width: 64px; height: 74px; }
+            .quantity-row { grid-column: 2 / 4; display: flex; justify-content: space-between; align-items: center; padding-top: .2rem; }
+            .summary-card { position: static !important; }
+        }
+    </style>
 </head>
 <body>
-
-    <nav class="navbar navbar-light bg-white shadow-sm py-3 mb-4">
-        <div class="container d-flex justify-content-between">
-            <a class="navbar-brand text-primary fw-bold" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a>
-            <a href="{% url 'catalogo' %}" class="btn btn-outline-secondary rounded-pill">Seguir Comprando</a>
+    <nav class="cart-nav py-3">
+        <div class="container cart-shell d-flex align-items-center justify-content-between">
+            <a class="text-decoration-none fw-bold fs-5 text-primary" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a>
+            <a href="{% url 'catalogo' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-arrow-left me-1"></i> Seguir viendo</a>
         </div>
     </nav>
 
-    <div class="container mb-5">
-        <h2 class="fw-bold mb-4">Tu Carrito de Compras</h2>
-        
-        <div class="row">
-            <div class="col-lg-8 mb-4">
-                <div class="card border-0 shadow-sm rounded-4">
-                    <div class="card-body p-4">
+    <main class="container cart-shell py-4 py-lg-5">
+        <div class="row align-items-end g-3 mb-4">
+            <div class="col-md-8"><p class="eyebrow mb-1">BOLSA DE COMPRA</p><h1 class="h2 fw-bold mb-0">Tu carrito</h1></div>
+            <div class="col-md-4"><div class="step-list justify-content-md-end"><span class="active"><span class="step-dot me-1">1</span>Carrito</span><i class="bi bi-dash"></i><span>Entrega</span><i class="bi bi-dash"></i><span>Pago</span></div></div>
+        </div>
+
+        {% if messages %}{% for message in messages %}<div class="alert alert-info border-0 shadow-sm rounded-4 mb-3"><i class="bi bi-info-circle me-2"></i>{{ message }}</div>{% endfor %}{% endif %}
+        {% if carrito_expirado %}<div class="alert alert-warning border-0 shadow-sm rounded-4 mb-3"><i class="bi bi-clock-history me-2"></i>Tu carrito expiró tras 24 horas sin cambios. Agrega nuevamente los productos que quieras comprar.</div>{% endif %}
+
+        <div class="row g-4 align-items-start">
+            <div class="col-lg-8">
+                <section class="cart-card">
+                    <div class="cart-card-header p-4 d-flex align-items-center justify-content-between"><div><h2 class="h5 fw-bold mb-1">Productos seleccionados</h2><p class="small text-secondary mb-0">Revisa tus tallas y cantidades antes de continuar.</p></div><span class="badge rounded-pill text-bg-light text-dark px-3 py-2">{{ carrito|length }} artículo{{ carrito|length|pluralize }}</span></div>
+                    <div class="p-3 p-md-4">
                         {% if carrito %}
-                            <div class="table-responsive">
-                                <table class="table align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>Producto</th>
-                                            <th>Precio</th>
-                                            <th>Cantidad</th>
-                                            <th>Subtotal</th>
-                                            <th class="text-end">Acción</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for key, item in carrito.items %}
-                                        <tr>
-                                            <td>
-                                                <strong>{{ item.nombre }}</strong><br>
-                                                <small class="text-muted">SKU: {{ item.sku }}</small>
-                                            </td>
-                                            <td>${{ item.precio }}</td>
-                                            
-                                            <!-- Columna de Cantidad con Botones - y + -->
-                                            <td>
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <a href="{% url 'restar_carrito' key %}" class="btn btn-sm btn-outline-secondary fw-bold px-2">-</a>
-                                                    <span class="fw-bold fs-6">{{ item.cantidad }}</span>
-                                                    <a href="{% url 'sumar_carrito' key %}" class="btn btn-sm btn-outline-secondary fw-bold px-2">+</a>
-                                                </div>
-                                            </td>
-                                            
-                                            <!-- Subtotal calculado por ítem -->
-                                            <td class="fw-bold text-dark">
-                                                ${% widthratio item.precio 1 item.cantidad %}
-                                            </td>
-                                            
-                                            <!-- Columna de Basurero (Elimina todo el producto) -->
-                                            <td class="text-end">
-                                                <a href="{% url 'eliminar_del_carrito' key %}" class="btn btn-sm btn-danger text-white shadow-sm rounded-3" title="Eliminar del carrito">
-                                                    <i class="bi bi-trash3-fill"></i>
-                                                </a>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
+                            {% for key, item in carrito.items %}
+                                <article class="cart-item">
+                                    {% if item.imagen_url %}<img class="item-image" src="{{ item.imagen_url }}" alt="{{ item.nombre }}">{% else %}<div class="item-placeholder"><i class="bi bi-image"></i></div>{% endif %}
+                                    <div><div class="item-name">{{ item.nombre }}</div><div class="item-meta mt-1">Talla {{ item.talla }}</div><div class="item-meta mt-2 d-none d-md-block">Precio unitario: ${{ item.precio }}</div></div>
+                                    <div class="quantity-row"><div><span class="item-price-label d-md-none">Cantidad</span><div class="quantity-control"><form method="post" action="{% url 'restar_carrito' key %}">{% csrf_token %}<button type="submit" aria-label="Restar una unidad">−</button></form><span>{{ item.cantidad }}</span><form method="post" action="{% url 'sumar_carrito' key %}">{% csrf_token %}<button type="submit" aria-label="Sumar una unidad">+</button></form></div></div><div class="d-md-none text-end"><span class="item-price-label">Subtotal</span><strong>${% widthratio item.precio 1 item.cantidad %}</strong></div></div>
+                                    <div class="text-end d-none d-md-block"><span class="item-price-label">Subtotal</span><strong>${% widthratio item.precio 1 item.cantidad %}</strong><form method="post" action="{% url 'eliminar_del_carrito' key %}" class="mt-2">{% csrf_token %}<button type="submit" class="remove-button" title="Eliminar {{ item.nombre }}" aria-label="Eliminar {{ item.nombre }}"><i class="bi bi-trash3"></i></button></form></div>
+                                    <form method="post" action="{% url 'eliminar_del_carrito' key %}" class="d-md-none">{% csrf_token %}<button type="submit" class="remove-button" title="Eliminar {{ item.nombre }}" aria-label="Eliminar {{ item.nombre }}"><i class="bi bi-trash3"></i></button></form>
+                                </article>
+                            {% endfor %}
                         {% else %}
-                            <div class="text-center py-5">
-                                <i class="bi bi-cart-x text-muted" style="font-size: 4rem;"></i>
-                                <h4 class="mt-3 text-muted">Tu carrito está vacío</h4>
-                                <a href="{% url 'catalogo' %}" class="btn btn-primary mt-3 rounded-pill px-4">Volver a la tienda</a>
-                            </div>
+                            <div class="empty-state"><div class="empty-icon"><i class="bi bi-bag-x"></i></div><h2 class="h4 fw-bold">Tu carrito está esperando prendas</h2><p class="text-secondary mb-4">Explora el catálogo y agrega las prendas que más te gusten.</p><a href="{% url 'catalogo' %}" class="btn btn-primary rounded-pill px-4">Explorar la tienda <i class="bi bi-arrow-right ms-1"></i></a></div>
                         {% endif %}
                     </div>
-                </div>
+                </section>
             </div>
 
-            <!-- Resumen y Pago -->
             <div class="col-lg-4">
-                <div class="card border-0 shadow-sm rounded-4 bg-white">
-                    <div class="card-body p-4">
-                        <h5 class="fw-bold mb-4">Resumen del Pedido</h5>
-                        <div class="d-flex justify-content-between mb-3 fs-5">
-                            <span class="fw-bold text-dark">Total a Pagar:</span>
-                            <span class="text-success fw-bold">${{ total }}</span>
-                        </div>
-                        <hr>
-                        {% if carrito %}
-                            <a href="{% url 'crear_pedido' %}" class="btn btn-primary btn-lg w-100 rounded-pill fw-bold shadow-sm">
-                                Ir a Pagar <i class="bi bi-arrow-right ms-2"></i>
-                            </a>
-                        {% else %}
-                            <button class="btn btn-secondary btn-lg w-100 rounded-pill fw-bold" disabled>Carrito Vacío</button>
-                        {% endif %}
-                    </div>
-                </div>
+                <aside class="summary-card sticky-top" style="top: 20px;"><div class="p-4 p-lg-5"><p class="eyebrow text-white-50 mb-1">RESUMEN</p><h2 class="h4 fw-bold mb-4">Tu compra</h2>
+                    {% if carrito_expira_en_timestamp %}<div class="cart-expiry p-3 mb-4"><div class="d-flex gap-2"><i class="bi bi-bag-check-fill text-success mt-1"></i><small class="muted">Tu carrito se conserva <strong class="text-white">24 horas desde el último cambio</strong>. Puedes seguir mirando con tranquilidad.</small></div></div>{% endif %}
+                    <div class="d-flex justify-content-between small muted mb-2"><span>Productos ({{ carrito|length }})</span><span>${{ total }}</span></div>
+                    <div class="d-flex justify-content-between align-items-end border-top border-secondary pt-3 mt-3 mb-3"><span class="fs-5">Subtotal</span><strong class="fs-2 text-success">${{ total }}</strong></div>
+                    <p class="small muted mb-4"><i class="bi bi-truck me-1"></i> El despacho, plazo y total final se informan antes de pagar.</p>
+                    {% if carrito %}<a href="{% url 'crear_pedido' %}" class="btn btn-primary pay-button w-100 fw-bold fs-5">Continuar con la entrega <i class="bi bi-arrow-right-circle ms-1"></i></a><a href="{% url 'politicas_despacho' %}" class="btn btn-link btn-sm text-white-50 text-decoration-none w-100 mt-3">Ver despacho, plazos y boleta</a>{% else %}<button class="btn btn-secondary pay-button w-100 fw-bold" disabled>Carrito vacío</button>{% endif %}
+                </div></aside>
             </div>
         </div>
-    </div>
-
+    </main>
 </body>
 </html>

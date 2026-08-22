@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Despacho y boleta · LogisFlow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body { background: #fcf7fa; color: #34233d; }
+        .hero { background: linear-gradient(135deg, #34233d, #b4487a); color: white; border-radius: 24px; }
+        .policy-card { border: 0; border-radius: 18px; box-shadow: 0 10px 30px rgba(75, 36, 64, .08); }
+        .option-icon { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: #fbe6ef; color: #b4487a; }
+        .text-primary { color: #b4487a !important; }
+        .btn-outline-primary { --bs-btn-color: #b4487a; --bs-btn-border-color: #b4487a; --bs-btn-hover-bg: #b4487a; --bs-btn-hover-border-color: #b4487a; }
+    </style>
+</head>
+<body>
+    <nav class="navbar bg-white border-bottom py-3">
+        <div class="container"><a class="navbar-brand fw-bold text-primary" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a><a href="{% url 'ver_carrito' %}" class="btn btn-outline-secondary rounded-pill">Volver al carrito</a></div>
+    </nav>
+    <main class="container py-4 py-lg-5" style="max-width: 960px;">
+        <section class="hero p-4 p-lg-5 mb-4">
+            <p class="small fw-bold text-white-50 mb-2">INFORMACIÓN ANTES DE PAGAR</p>
+            <h1 class="display-6 fw-bold">Despacho claro, seguimiento simple</h1>
+            <p class="mb-0 text-white-50">El costo, rango estimado y forma de seguimiento quedan informados antes de iniciar el pago.</p>
+        </section>
+
+        <section class="row g-3 mb-4">
+            {% for opcion in opciones_entrega %}
+                <div class="col-md-4"><article class="card policy-card h-100"><div class="card-body p-4"><span class="option-icon mb-3"><i class="bi bi-{% if opcion.tarifa %}train-lightrail-front{% elif opcion.costo == 0 %}shop{% else %}truck{% endif %}"></i></span><h2 class="h5 fw-bold">{{ opcion.nombre }}</h2><p class="h4 text-primary mb-3">{% if opcion.tarifa %}{{ opcion.tarifa }}{% else %}${{ opcion.costo }}{% endif %}</p><p class="small mb-2"><strong>Plazo:</strong> {{ opcion.plazo }}</p><p class="small text-secondary mb-0">{{ opcion.seguimiento }}</p></div></article></div>
+            {% endfor %}
+        </section>
+
+        <section class="card policy-card mb-4"><div class="card-body p-4 p-lg-5">
+            <h2 class="h4 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i>Plazos y política ante retrasos</h2>
+            <ul class="mb-0 text-secondary">
+                <li>Los plazos se cuentan desde que Mercado Pago confirme el pago y corresponden a días hábiles.</li>
+                <li>Para entrega en Metro, el cliente elige una estación del tramo Universidad de Chile–Tobalaba. El cobro se calcula a $200 por kilómetro desde Universidad de Chile y queda registrado en el pedido.</li>
+                <li>El seguimiento se consulta con el RUT y el código entregado al confirmar el pedido; las coordinaciones relevantes se realizan por WhatsApp al número validado en checkout.</li>
+                <li>Si surge un retraso, se informará el estado y la nueva estimación por el canal de contacto registrado.</li>
+                <li>Una dirección, estación o teléfono incompleto puede requerir una nueva coordinación y afectar el plazo informado.</li>
+            </ul>
+        </div></section>
+
+        <section class="card policy-card border-start border-4 border-warning"><div class="card-body p-4 p-lg-5">
+            <h2 class="h4 fw-bold"><i class="bi bi-receipt text-warning me-2"></i>Boleta electrónica</h2>
+            <p class="mb-0 text-secondary">La emisión de boleta/DTE está definida como una <strong>integración futura con el SII</strong>. Este proyecto no emite ni simula boletas tributarias mientras no exista esa integración y autorización correspondiente.</p>
+        </div></section>
+    </main>
+</body>
+</html>

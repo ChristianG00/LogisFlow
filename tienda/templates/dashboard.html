@@ -3,43 +3,58 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Administración - LogisFlow</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
-        body {
-            background-color: #f4f6f9;
-        }
-
-        .kpi-card {
-            border-left: 5px solid;
-            border-radius: 10px;
-            transition: transform 0.2s;
-        }
-
-        .kpi-card:hover {
-            transform: translateY(-3px);
-        }
-
-        .img-thumbnail-small {
-            width: 40px;
-            height: 40px;
-            object-fit: cover;
-            border-radius: 5px;
-        }
-
-        .calc-result {
-            background: #e9ecef;
-            border-radius: 10px;
-            border-left: 5px solid #198754;
-        }
+        :root { --ink: #34233d; --brand: #b4487a; --surface: #fff; }
+        body { min-height: 100vh; color: var(--ink); background: radial-gradient(circle at top right, #fbe2ee 0, transparent 34rem), #fcf7fa; }
+        .admin-nav { background: rgba(23,32,51,.97); backdrop-filter: blur(12px); }
+        .dashboard-shell { max-width: 1440px; }
+        .admin-hero { position: relative; overflow: hidden; border-radius: 22px; background: linear-gradient(120deg, #34233d, #784162); color: white; }
+        .admin-hero::after { content: ''; position: absolute; width: 240px; height: 240px; border: 42px solid rgba(123,229,194,.12); border-radius: 50%; right: -80px; top: -130px; }
+        .admin-hero > * { position: relative; z-index: 1; }
+        .eyebrow { color: #7be5c2; font-size: .72rem; font-weight: 800; letter-spacing: .11em; }
+        .kpi-card { border: 1px solid #e5eaf2; border-top: 4px solid; border-radius: 17px; background: rgba(255,255,255,.93); box-shadow: 0 10px 28px rgba(28,48,83,.07); transition: transform .2s ease, box-shadow .2s ease; }
+        .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 16px 32px rgba(28,48,83,.12); }
+        .kpi-card h6 { font-size: .68rem !important; letter-spacing: .07em; }
+        .kpi-card h4 { letter-spacing: -.03em; }
+        .nav-tabs { border: 0; gap: .45rem; flex-wrap: wrap; }
+        .nav-tabs .nav-link { border: 1px solid #e1e6ef; border-radius: 11px; color: #66748a; background: rgba(255,255,255,.68); }
+        .nav-tabs .nav-link:hover { border-color: #e6abc5; color: var(--brand); }
+        .nav-tabs .nav-link.active { border-color: var(--brand); color: white; background: var(--brand); box-shadow: 0 7px 16px rgba(180,72,122,.18); }
+        .tab-content { border: 0 !important; border-radius: 20px !important; box-shadow: 0 14px 38px rgba(28,48,83,.08); }
+        .table { --bs-table-bg: transparent; }
+        .table > :not(caption) > * > * { padding: .9rem .75rem; border-bottom-color: #edf0f4; }
+        .table thead th { color: #6c788c; font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+        .table-hover tbody tr:hover > * { --bs-table-accent-bg: #fff4f8; }
+        .img-thumbnail-small { width: 50px; height: 50px; object-fit: cover; border-radius: 12px; border: 0; }
+        .calculator-card { border: 1px solid #f0e2e9; border-radius: 19px; background: #fffafd; }
+        .calculator-card .input-group-text { border-color: #eadde5; background: #fff3f8; color: var(--brand); }
+        .calculator-card .form-control { min-height: 46px; }
+        .calc-result { color: white; background: linear-gradient(145deg, #34233d, #7e426b); border: 0; border-radius: 19px; overflow: hidden; }
+        .calc-result::before { content: ''; display: block; height: 5px; background: linear-gradient(90deg, #f4a6c4, #c58ae5); }
+        .calc-row { display: flex; justify-content: space-between; gap: 1rem; padding: .8rem 0; border-bottom: 1px solid rgba(255,255,255,.14); }
+        .calc-row:last-of-type { border-bottom: 0; }
+        .calc-label { color: rgba(255,255,255,.7); font-size: .8rem; }
+        .price-highlight { border-radius: 16px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16); }
+        .price-highlight .price-value { color: #f7bed5; font-size: clamp(2rem, 4vw, 2.8rem); letter-spacing: -.06em; }
+        .calc-mini { border: 1px solid #f0e2e9; border-radius: 13px; background: #fff; }
+        .calc-note { color: #786b78; font-size: .8rem; }
+        .modal-content { border-radius: 20px; overflow: hidden; }
+        .form-control, .form-select { border-color: #dce3ed; min-height: 40px; }
+        .form-control:focus, .form-select:focus { border-color: #e59bbb; box-shadow: 0 0 0 .2rem rgba(180,72,122,.12); }
+        .btn-primary { --bs-btn-bg: #b4487a; --bs-btn-border-color: #b4487a; --bs-btn-hover-bg: #93365f; --bs-btn-hover-border-color: #93365f; }
+        .text-primary { color: var(--brand) !important; }
+        @media (max-width: 767px) { .dashboard-shell { padding-left: 12px !important; padding-right: 12px !important; } .admin-hero { border-radius: 16px; } .tab-content { padding: 1rem !important; } }
     </style>
 </head>
 
 <body>
 
     <!-- Navbar Admin -->
-    <nav class="navbar navbar-dark bg-dark shadow-sm">
+    <nav class="navbar navbar-dark admin-nav shadow-sm py-3">
         <div class="container-fluid px-4">
             <a class="navbar-brand fw-bold" href="#"><i class="bi bi-shield-lock me-2"></i>Admin LogisFlow</a>
             <div>
@@ -54,7 +69,23 @@
         </div>
     </nav>
 
-    <div class="container-fluid px-4 py-4">
+    <div class="container dashboard-shell py-4 py-lg-5">
+
+        <section class="admin-hero p-4 p-lg-5 mb-4">
+            <div class="d-flex flex-wrap align-items-end justify-content-between gap-3">
+                <div><p class="eyebrow mb-2">CENTRO DE OPERACIONES</p><h1 class="h2 fw-bold mb-2">Panel LogisFlow</h1><p class="text-white-50 mb-0">Gestiona ventas confirmadas, despacho e inventario desde un solo lugar.</p></div>
+                <span class="badge rounded-pill text-bg-light text-dark px-3 py-2"><i class="bi bi-shield-check text-success me-1"></i>Administración segura</span>
+            </div>
+        </section>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
 
         <!-- SECCIÓN 1: SUPER KPIs -->
         <div class="row g-3 mb-4">
@@ -88,8 +119,8 @@
             <div class="col-md-4 col-lg-2">
                 <div class="card kpi-card shadow-sm h-100" style="border-color: #fd7e14;">
                     <div class="card-body p-3">
-                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem;">Carritos
-                            Abandonados</h6>
+                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem;">Pagos no
+                            confirmados</h6>
                         <h4 class="mb-0 fw-bold" style="color:#fd7e14;">{{ pedidos_pendientes }}</h4>
                     </div>
                 </div>
@@ -122,8 +153,8 @@
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link text-warning" id="abandonos-tab" data-bs-toggle="tab"
-                    data-bs-target="#abandonos" type="button" role="tab"><i class="bi bi-cart-x me-2"></i>Carritos
-                    Abandonados</button>
+                    data-bs-target="#abandonos" type="button" role="tab"><i class="bi bi-credit-card me-2"></i>Pagos
+                    no confirmados</button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="inventario-tab" data-bs-toggle="tab" data-bs-target="#inventario"
@@ -152,6 +183,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th>N° Orden</th>
+                                <th>Código seguimiento</th>
                                 <th>Fecha</th>
                                 <th>Cliente</th>
                                 <th>Tipo Entrega</th>
@@ -163,17 +195,18 @@
                             {% for pedido in pedidos %}
                             <tr>
                                 <td class="fw-bold text-primary">#{{ pedido.id }}</td>
+                                <td><code class="text-dark">{{ pedido.codigo_seguimiento }}</code></td>
                                 <td>{{ pedido.fecha }}</td>
                                 <td>
                                     <span class="fw-bold">{{ pedido.cliente.nombre }}</span><br>
                                     <small class="text-muted d-block mb-1">{{ pedido.cliente.rut }}</small>
-                                    <a href="https://wa.me/56{{ pedido.cliente.telefono }}?text=¡Hola {{ pedido.cliente.nombre }}! Te contactamos de LogisFlow 📦. Te avisamos que tu pedido %23{{ pedido.id }} se encuentra actualmente en estado: *{{ pedido.estado }}*."
+                                    <a href="https://wa.me/{{ pedido.cliente.telefono_whatsapp }}"
                                         target="_blank" class="btn btn-sm btn-outline-success py-0"
                                         style="font-size: 0.75rem;">
                                         <i class="bi bi-whatsapp me-1"></i> Notificar
                                     </a>
                                 </td>
-                                <td>{{ pedido.tipo_entrega }}</td>
+                                <td><strong>{{ pedido.get_tipo_entrega_display }}</strong><br><small class="text-muted">${{ pedido.costo_despacho }} · {{ pedido.plazo_entrega }}</small></td>
                                 <td>
                                     {% ifequal pedido.estado 'Preparando' %}<span
                                         class="badge bg-warning text-dark">Preparando</span>{% endifequal %}
@@ -187,7 +220,7 @@
                                     <span class="text-success fw-bold"><i class="bi bi-check2-all"></i> Ciclo
                                         Cerrado</span>
                                     {% else %}
-                                    <form method="POST" class="d-flex gap-2">
+                                    <form method="POST" action="{% url 'actualizar_estado_pedido' %}" class="d-flex gap-2">
                                         {% csrf_token %}
                                         <input type="hidden" name="pedido_id" value="{{ pedido.id }}">
                                         <select name="estado" class="form-select form-select-sm">
@@ -204,7 +237,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">No hay pedidos registrados aún.</td>
+                                <td colspan="7" class="text-center text-muted py-4">No hay pedidos registrados aún.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -212,16 +245,16 @@
                 </div>
             </div>
 
-            <!-- PESTAÑA 2: CARRITOS ABANDONADOS -->
+            <!-- PESTAÑA 2: INTENTOS DE PAGO NO CONFIRMADOS -->
             <div class="tab-pane fade" id="abandonos" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h4 class="mb-0 text-warning"><i class="bi bi-cart-x me-2"></i>Intentos de Compra (No pagados)</h4>
+                    <h4 class="mb-0 text-warning"><i class="bi bi-credit-card me-2"></i>Intentos de pago no confirmados</h4>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>N° Orden</th>
+                                <th>N° Intento</th>
                                 <th>Fecha del Intento</th>
                                 <th>Cliente (Posible Contacto)</th>
                                 <th>Estado Actual</th>
@@ -231,19 +264,18 @@
                             {% for ab in abandonados %}
                             <tr>
                                 <td class="fw-bold text-secondary">#{{ ab.id }}</td>
-                                <td>{{ ab.fecha }}</td>
+                                <td>{{ ab.creado_en }}</td>
                                 <td>
-                                    <strong>{{ ab.cliente.nombre }}</strong><br>
-                                    <a href="https://wa.me/56{{ ab.cliente.telefono }}" target="_blank"
+                                    <strong>{{ ab.nombre }}</strong><br>
+                                    <a href="https://wa.me/{{ ab.telefono_whatsapp }}" target="_blank"
                                         class="text-success text-decoration-none small"><i class="bi bi-whatsapp"></i>
-                                        {{ ab.cliente.telefono }}</a>
+                                        {{ ab.telefono }}</a>
                                 </td>
-                                <td><span class="badge bg-secondary">Abandonado</span></td>
+                                <td><span class="badge bg-warning text-dark">Pago pendiente</span></td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="4" class="text-center text-muted py-4">Excelente, no tienes carritos
-                                    abandonados.</td>
+                                <td colspan="4" class="text-center text-muted py-4">No hay intentos de pago pendientes.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -284,7 +316,6 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <span class="badge bg-dark mb-1">{{ prod.sku }}</span><br>
                                     <span class="fw-bold">{{ prod.nombre }}</span>
                                 </td>
                                 <td>${{ prod.precio }}</td>
@@ -292,8 +323,8 @@
                                     <div class="d-flex flex-wrap gap-1 mb-2">
                                         {% for variante in prod.variantes.all %}
                                         <span
-                                            class="badge {% if variante.stock <= 3 %}bg-danger{% else %}bg-secondary{% endif %}">
-                                            {{ variante.talla }}: {{ variante.stock }}
+                                            class="badge {% if variante.stock_disponible <= 3 %}bg-danger{% else %}bg-secondary{% endif %}">
+                                            {{ variante.talla }}: {{ variante.stock_disponible }} disp.{% if variante.stock_reservado %} · {{ variante.stock_reservado }} res.{% endif %}
                                         </span>
                                         {% empty %}
                                         <span class="text-muted small">Sin tallas ingresadas</span>
@@ -307,15 +338,15 @@
                                 </td>
                                 <td class="text-end">
                                     <button class="btn btn-sm btn-outline-primary me-1"
-                                        onclick="editarProducto('{{ prod.id }}', '{{ prod.sku }}', '{{ prod.nombre|escapejs }}', '{{ prod.precio }}', '{{ prod.genero }}', '{{ prod.categoria }}', '{{ prod.color_base }}', '{{ prod.estilo }}', '{{ prod.temporada }}')"
+                                        onclick="editarProducto('{{ prod.id }}', '{{ prod.nombre|escapejs }}', '{{ prod.precio }}', '{{ prod.categoria }}', '{{ prod.color_base }}', '{{ prod.estilo }}', '{{ prod.temporada }}')"
                                         data-bs-toggle="modal" data-bs-target="#modalProducto">
                                         <i class="bi bi-pencil-fill"></i>
                                     </button>
-                                    <a href="{% url 'eliminar_producto' prod.id %}"
-                                        class="btn btn-sm btn-outline-danger"
-                                        onclick="return confirm('¿Estás segura? Se borrarán todas sus tallas también.')">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </a>
+                                    <form method="post" action="{% url 'eliminar_producto' prod.id %}" class="d-inline"
+                                        onsubmit="return confirm('¿Estás segura? Se borrarán todas sus tallas también.')">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash-fill"></i></button>
+                                    </form>
                                 </td>
                             </tr>
                             {% empty %}
@@ -331,76 +362,23 @@
 
             <!-- PESTAÑA 4: CALCULADORA DE PRECIOS -->
             <div class="tab-pane fade" id="cotizador" role="tabpanel">
-                <div class="row">
-                    <div class="col-md-7">
-                        <h4 class="mb-4">Calculadora de Precio de Venta</h4>
-                        <form id="formCalculadora">
+                <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-4"><div><p class="eyebrow mb-1">HERRAMIENTA DE PRECIOS</p><h4 class="mb-1">Calcula un precio rentable</h4><p class="text-secondary small mb-0">Incluye costos reales, comisión de pago y un margen objetivo.</p></div><span class="badge rounded-pill border bg-light text-dark px-3 py-2"><i class="bi bi-info-circle me-1 text-primary"></i>Valores referenciales</span></div>
+                <div class="row g-4">
+                    <div class="col-lg-7">
+                        <form id="formCalculadora" class="calculator-card p-4" onsubmit="return false;">
+                            <div class="d-flex align-items-center gap-2 mb-4"><span class="rounded-circle d-inline-flex align-items-center justify-content-center text-white" style="width:34px;height:34px;background:#b4487a;"><i class="bi bi-receipt"></i></span><div><h5 class="mb-0 fw-bold">Costos de la prenda</h5><small class="text-secondary">Completa solo los montos que apliquen.</small></div></div>
                             <div class="row g-3">
-                                <div class="col-12">
-                                    <label class="form-label fw-bold text-primary"><i class="bi bi-tag-fill me-2"></i>1.
-                                        Costo Base</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">$</span>
-                                        <input type="number" class="form-control" id="costo_producto" min="0"
-                                            oninput="calcularPrecioVenta()">
-                                    </div>
-                                </div>
-                                <div class="col-md-6 mt-4">
-                                    <label class="form-label fw-bold text-danger"><i
-                                            class="bi bi-fuel-pump-fill me-2"></i>2. Transporte</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">$</span>
-                                        <input type="number" class="form-control" id="costo_transporte" value="0"
-                                            min="0" oninput="calcularPrecioVenta()">
-                                    </div>
-                                </div>
-                                <div class="col-md-6 mt-4">
-                                    <label class="form-label fw-bold text-danger"><i
-                                            class="bi bi-box-seam-fill me-2"></i>3. Empaque</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">$</span>
-                                        <input type="number" class="form-control" id="costo_empaque" value="0" min="0"
-                                            oninput="calcularPrecioVenta()">
-                                    </div>
-                                </div>
-                                <div class="col-12 mt-4">
-                                    <label class="form-label fw-bold text-success"><i
-                                            class="bi bi-graph-up-arrow me-2"></i>4. Margen de Ganancia (%)</label>
-                                    <div class="input-group">
-                                        <input type="number" class="form-control" id="margen_ganancia" value="40"
-                                            min="0" oninput="calcularPrecioVenta()">
-                                        <span class="input-group-text">%</span>
-                                    </div>
-                                </div>
+                                <div class="col-12"><label class="form-label fw-bold">Costo de compra o confección</label><div class="input-group"><span class="input-group-text">$</span><input type="number" class="form-control" id="costo_producto" min="0" step="1" inputmode="numeric" placeholder="Ej: 12000" oninput="calcularPrecioVenta()"></div></div>
+                                <div class="col-md-6"><label class="form-label fw-bold">Transporte hasta ti</label><div class="input-group"><span class="input-group-text">$</span><input type="number" class="form-control" id="costo_transporte" value="0" min="0" step="1" inputmode="numeric" oninput="calcularPrecioVenta()"></div></div>
+                                <div class="col-md-6"><label class="form-label fw-bold">Empaque</label><div class="input-group"><span class="input-group-text">$</span><input type="number" class="form-control" id="costo_empaque" value="0" min="0" step="1" inputmode="numeric" oninput="calcularPrecioVenta()"></div></div>
+                                <div class="col-md-6"><label class="form-label fw-bold">Otros costos</label><div class="input-group"><span class="input-group-text">$</span><input type="number" class="form-control" id="otros_costos" value="0" min="0" step="1" inputmode="numeric" oninput="calcularPrecioVenta()"></div></div>
+                                <div class="col-md-6"><label class="form-label fw-bold">Comisión de pago</label><div class="input-group"><input type="number" class="form-control" id="comision_pago" value="0" min="0" max="99" step="0.1" inputmode="decimal" oninput="calcularPrecioVenta()"><span class="input-group-text">%</span></div><small class="calc-note">Ej.: comisión del medio de pago.</small></div>
+                                <div class="col-12"><label class="form-label fw-bold text-primary"><i class="bi bi-graph-up-arrow me-2"></i>Margen que quieres ganar</label><div class="input-group"><input type="number" class="form-control" id="margen_ganancia" value="40" min="0" max="1000" step="1" inputmode="numeric" oninput="calcularPrecioVenta()"><span class="input-group-text">% sobre tus costos</span></div></div>
                             </div>
+                            <div class="d-flex flex-wrap gap-2 mt-4"><button type="button" class="btn btn-outline-secondary rounded-pill px-3" onclick="resetearCalculadora()"><i class="bi bi-arrow-counterclockwise me-1"></i>Restablecer</button><span class="calc-note align-self-center">El precio se redondea hacia arriba a los $100.</span></div>
                         </form>
                     </div>
-                    <div class="col-md-5 mt-4 mt-md-0">
-                        <div class="calc-result p-4 shadow-sm h-100 d-flex flex-column justify-content-center">
-                            <h5 class="fw-bold mb-4"><i class="bi bi-cash-coin me-2"></i>Análisis de Precio</h5>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">Valor Producto:</span><span class="fw-bold text-dark"
-                                    id="res_producto">$0</span>
-                            </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">Gastos Operativos:</span><span class="fw-bold text-danger"
-                                    id="res_operativos">+$0</span>
-                            </div>
-                            <hr>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span class="fw-bold">Costo Total Real:</span><span class="fw-bold text-dark fs-5"
-                                    id="res_costototal">$0</span>
-                            </div>
-                            <div class="d-flex justify-content-between mb-4">
-                                <span class="text-success fw-bold">Tu Ganancia Neta:</span><span
-                                    class="text-success fw-bold" id="res_ganancia">+$0</span>
-                            </div>
-                            <div class="p-3 bg-white rounded-3 border text-center">
-                                <span class="d-block mb-1 fw-bold text-muted">PRECIO DE VENTA SUGERIDO</span>
-                                <span class="fs-2 fw-bold text-success" id="res_precioventa">$0</span>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="col-lg-5"><section class="calc-result shadow-sm h-100"><div class="p-4 p-lg-5"><div class="d-flex justify-content-between align-items-start gap-3 mb-4"><div><p class="eyebrow text-white-50 mb-1">RESULTADO</p><h5 class="fw-bold mb-0">Precio recomendado</h5></div><i class="bi bi-stars fs-3" style="color:#f7bed5;"></i></div><div class="price-highlight text-center p-3 mb-4"><span class="d-block small text-white-50">PRECIO DE LISTA REDONDEADO</span><strong class="price-value" id="res_precioventa">—</strong><small class="d-block text-white-50 mt-1" id="resumen_precio">Ingresa el costo de la prenda para calcular.</small></div><div class="calc-row"><span class="calc-label">Costos directos</span><strong id="res_costototal">$0</strong></div><div class="calc-row"><span class="calc-label">Comisión estimada</span><strong id="res_comision">$0</strong></div><div class="calc-row"><span class="calc-label">Ganancia neta estimada</span><strong id="res_ganancia">$0</strong></div><div class="calc-row"><span class="calc-label">Margen real sobre costo</span><strong id="res_margen_real">0%</strong></div><div class="calc-mini mt-4 p-3 text-dark"><span class="d-block text-secondary small fw-bold">PRECIO MÍNIMO PARA NO PERDER</span><strong class="fs-5" id="res_precio_minimo">$0</strong><span class="d-block calc-note mt-1">Cubre costos y comisión, sin ganancia.</span></div></div></section></div>
                 </div>
             </div>
         </div>
@@ -421,19 +399,15 @@
                         <input type="hidden" id="prod_id" name="id">
 
                         <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Código SKU</label>
-                                <input type="text" class="form-control" id="prod_sku" name="sku" required>
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold">Nombre de la prenda</label>
+                                <input type="text" class="form-control" id="prod_nombre" name="nombre" required>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label class="form-label fw-bold">Precio Unitario ($)</label>
                                 <input type="number" class="form-control" id="prod_precio" name="precio" min="0"
                                     required>
                             </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Nombre de la Prenda</label>
-                            <input type="text" class="form-control" id="prod_nombre" name="nombre" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Subir Fotografía</label>
@@ -445,21 +419,20 @@
                             Heurístico</h6>
 
                         <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold text-primary">Género</label>
-                                <select class="form-select border-primary" id="prod_genero" name="genero" required>
-                                    <option value="M" selected>Mujer</option>
-                                    <option value="U">Unisex / Accesorios</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold text-primary">Categoría (IA)</label>
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold text-primary">Categoría de la prenda</label>
                                 <select class="form-select border-primary" id="prod_categoria" name="categoria"
                                     required>
-                                    <option value="SUPERIOR">Parte de Arriba</option>
-                                    <option value="INFERIOR">Parte de Abajo</option>
+                                    <option value="POLERAS">Poleras y tops</option>
+                                    <option value="BLUSAS">Blusas</option>
+                                    <option value="PANTALONES">Pantalones y jeans</option>
+                                    <option value="FALDAS">Faldas</option>
+                                    <option value="VESTIDOS">Vestidos</option>
+                                    <option value="CHAQUETAS">Chaquetas y abrigos</option>
                                     <option value="CALZADO">Calzado</option>
                                     <option value="ACCESORIO">Accesorio</option>
+                                    <option value="SUPERIOR">Tops y poleras (general)</option>
+                                    <option value="INFERIOR">Pantalones y faldas (general)</option>
                                 </select>
                             </div>
                         </div>
@@ -470,11 +443,17 @@
                                 <select class="form-select border-success" id="prod_color" name="color_base" required>
                                     <option value="NEGRO">Negro</option>
                                     <option value="BLANCO">Blanco</option>
+                                    <option value="BEIGE">Beige / Café</option>
                                     <option value="JEANS">Denim / Jeans</option>
+                                    <option value="ROSADO">Rosado</option>
+                                    <option value="FUCSIA">Fucsia</option>
+                                    <option value="LILA">Lila</option>
+                                    <option value="MORADO">Morado</option>
+                                    <option value="CORAL">Coral</option>
+                                    <option value="BURDEO">Burdeo</option>
                                     <option value="ROJO">Rojo</option>
                                     <option value="AZUL">Azul</option>
                                     <option value="VERDE">Verde</option>
-                                    <option value="BEIGE">Beige/Café</option>
                                     <option value="OTRO">Otro / Estampado</option>
                                 </select>
                             </div>
@@ -551,24 +530,20 @@
         function limpiarModalProducto() {
             document.getElementById('modalTitulo').innerText = 'Nuevo Producto';
             document.getElementById('prod_id').value = '';
-            document.getElementById('prod_sku').value = '';
             document.getElementById('prod_nombre').value = '';
             document.getElementById('prod_precio').value = '';
-            document.getElementById('prod_genero').value = 'M';
-            document.getElementById('prod_categoria').value = 'SUPERIOR';
+            document.getElementById('prod_categoria').value = 'POLERAS';
             document.getElementById('prod_color').value = 'NEGRO';
             document.getElementById('prod_estilo').value = 'CASUAL';
             document.getElementById('prod_temporada').value = 'ATEMPORAL';
         }
 
-        function editarProducto(id, sku, nombre, precio, genero, categoria, color, estilo, temporada) {
+        function editarProducto(id, nombre, precio, categoria, color, estilo, temporada) {
             document.getElementById('modalTitulo').innerText = 'Editar Producto';
             document.getElementById('prod_id').value = id;
-            document.getElementById('prod_sku').value = sku;
             document.getElementById('prod_nombre').value = nombre;
             document.getElementById('prod_precio').value = precio;
 
-            if (genero) document.getElementById('prod_genero').value = genero;
             if (categoria) document.getElementById('prod_categoria').value = categoria;
             if (color) document.getElementById('prod_color').value = color;
             if (estilo) document.getElementById('prod_estilo').value = estilo;
@@ -580,23 +555,48 @@
             document.getElementById('talla_prod_nombre').innerText = "Prenda: " + nombre;
         }
 
-        function calcularPrecioVenta() {
-            let cp = parseInt(document.getElementById('costo_producto').value) || 0;
-            let ct = parseInt(document.getElementById('costo_transporte').value) || 0;
-            let ce = parseInt(document.getElementById('costo_empaque').value) || 0;
-            let mg = parseFloat(document.getElementById('margen_ganancia').value) || 0;
-
-            let go = ct + ce;
-            let ctr = cp + go;
-            let gn = ctr * (mg / 100);
-            let pv = ctr + gn;
-
-            document.getElementById('res_producto').innerText = '$' + cp.toLocaleString('es-CL');
-            document.getElementById('res_operativos').innerText = '+$' + go.toLocaleString('es-CL');
-            document.getElementById('res_costototal').innerText = '$' + ctr.toLocaleString('es-CL');
-            document.getElementById('res_ganancia').innerText = '+$' + Math.round(gn).toLocaleString('es-CL');
-            document.getElementById('res_precioventa').innerText = '$' + Math.round(pv).toLocaleString('es-CL');
+        function valorCalculadora(id) {
+            const valor = Number(document.getElementById(id).value);
+            return Number.isFinite(valor) && valor >= 0 ? valor : 0;
         }
+
+        function formatoPesos(valor) {
+            return '$' + Math.round(valor).toLocaleString('es-CL');
+        }
+
+        function calcularPrecioVenta() {
+            const costoProducto = valorCalculadora('costo_producto');
+            const transporte = valorCalculadora('costo_transporte');
+            const empaque = valorCalculadora('costo_empaque');
+            const otrosCostos = valorCalculadora('otros_costos');
+            const margenObjetivo = valorCalculadora('margen_ganancia');
+            const comision = Math.min(99, valorCalculadora('comision_pago'));
+            const costosDirectos = costoProducto + transporte + empaque + otrosCostos;
+            const factorComision = 1 - (comision / 100);
+            const precioMinimo = costosDirectos / factorComision;
+            const precioExacto = precioMinimo * (1 + (margenObjetivo / 100));
+            const precioSugerido = costosDirectos ? Math.ceil(precioExacto / 100) * 100 : 0;
+            const comisionEstimada = precioSugerido * (comision / 100);
+            const gananciaNeta = precioSugerido - costosDirectos - comisionEstimada;
+            const margenReal = costosDirectos ? (gananciaNeta / costosDirectos) * 100 : 0;
+
+            document.getElementById('res_costototal').innerText = formatoPesos(costosDirectos);
+            document.getElementById('res_comision').innerText = formatoPesos(comisionEstimada);
+            document.getElementById('res_ganancia').innerText = formatoPesos(gananciaNeta);
+            document.getElementById('res_margen_real').innerText = costosDirectos ? margenReal.toFixed(1).replace('.', ',') + '%' : '0%';
+            document.getElementById('res_precio_minimo').innerText = formatoPesos(precioMinimo);
+            document.getElementById('res_precioventa').innerText = costosDirectos ? formatoPesos(precioSugerido) : '—';
+            document.getElementById('resumen_precio').innerText = costosDirectos
+                ? 'Incluye ' + margenObjetivo.toLocaleString('es-CL') + '% de margen y ' + comision.toLocaleString('es-CL') + '% de comisión.'
+                : 'Ingresa el costo de la prenda para calcular.';
+        }
+
+        function resetearCalculadora() {
+            document.getElementById('formCalculadora').reset();
+            calcularPrecioVenta();
+        }
+
+        calcularPrecioVenta();
     </script>
 </body>
 

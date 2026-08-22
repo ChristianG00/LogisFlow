@@ -2,190 +2,277 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Finalizar Compra - LogisFlow</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finalizar compra · LogisFlow</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
-        body { background-color: #f8f9fa; }
-        .checkout-card { border-radius: 15px; border: none; }
-        .resumen-card { background-color: #212529; color: white; border-radius: 15px; }
-        .error-message { font-size: 0.85rem; color: #dc3545; margin-top: 5px; font-weight: bold; }
+        :root { --ink: #34233d; --brand: #b4487a; --surface: #ffffff; }
+        body { min-height: 100vh; background: radial-gradient(circle at top left, #fbe2ee 0, transparent 34rem), #fcf7fa; color: var(--ink); }
+        .checkout-nav { background: rgba(255,255,255,.9); backdrop-filter: blur(12px); border-bottom: 1px solid #e7ebf2; }
+        .checkout-shell { max-width: 1120px; }
+        .step-dot { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: #fbe6ef; color: var(--brand); font-weight: 700; }
+        .checkout-steps { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+        .checkout-step { display: inline-flex; align-items: center; gap: .45rem; color: #738096; font-size: .8rem; font-weight: 700; }
+        .checkout-step i { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; background: #e8ebf1; border-radius: 50%; font-size: .7rem; }
+        .checkout-step.done, .checkout-step.current { color: #a23d6c; }
+        .checkout-step.done i, .checkout-step.current i { color: white; background: var(--brand); }
+        .checkout-step-separator { width: 24px; height: 1px; background: #d9dee8; }
+        .form-card, .summary-card { border: 0; border-radius: 22px; box-shadow: 0 14px 42px rgba(28, 48, 83, .09); }
+        .form-card { background: var(--surface); }
+        .section-title { font-size: .82rem; color: #6b7280; font-weight: 800; letter-spacing: .09em; }
+        .field-block { background: #fafbfe; border: 1px solid #e8ebf2; border-radius: 14px; padding: 1rem; height: 100%; }
+        .form-control, .form-select { border-radius: 10px; border-color: #dce2ed; min-height: 44px; }
+        .form-control:focus, .form-select:focus { border-color: #e59bbb; box-shadow: 0 0 0 .2rem rgba(180,72,122,.12); }
+        .summary-card { background: var(--ink); color: white; overflow: hidden; }
+        .summary-card::before { content: ''; display: block; height: 5px; background: linear-gradient(90deg, #f4a6c4, #c58ae5); }
+        .cart-item + .cart-item { border-top: 1px solid rgba(255,255,255,.13); }
+        .item-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 12px; background: #2b3852; }
+        .timer-box { border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.08); border-radius: 14px; }
+        .timer-value { color: #7be5c2; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+        .secure-note { background: #eef8f4; color: #145a43; border-radius: 14px; }
+        .delivery-preview { border: 1px solid rgba(123,229,194,.35); background: rgba(65,216,171,.08); border-radius: 14px; }
+        .delivery-preview .delivery-cost { color: #7be5c2; }
+        .pay-button { border-radius: 14px; min-height: 56px; box-shadow: 0 10px 20px rgba(36,107,253,.22); }
+        .error-message { font-size: .82rem; color: #c7364d; margin-top: .45rem; font-weight: 600; }
+        .btn-primary { --bs-btn-bg: #b4487a; --bs-btn-border-color: #b4487a; --bs-btn-hover-bg: #93365f; --bs-btn-hover-border-color: #93365f; --bs-btn-active-bg: #7a294e; --bs-btn-active-border-color: #7a294e; }
+        .text-primary { color: var(--brand) !important; }
+        @media (max-width: 991px) { .summary-card { position: static !important; } }
     </style>
 </head>
 <body>
+    <nav class="checkout-nav py-3">
+        <div class="container checkout-shell d-flex align-items-center justify-content-between">
+            <a class="text-decoration-none fw-bold fs-5 text-primary" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a>
+            <a href="{% url 'ver_carrito' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-arrow-left me-1"></i> Volver al carrito</a>
+        </div>
+    </nav>
 
-    <div class="container py-5">
-        
-        <!-- Botón Volver -->
-        <div class="mb-4">
-            <a href="{% url 'ver_carrito' %}" class="text-decoration-none text-secondary">
-                <i class="bi bi-arrow-left me-2"></i>Volver al Carrito
-            </a>
+    <main class="container checkout-shell py-4 py-lg-5">
+        <div class="row align-items-end mb-4 g-3">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="step-dot">2</span>
+                    <div>
+                        <p class="section-title mb-1">CHECKOUT SEGURO</p>
+                        <h1 class="h2 fw-bold mb-0">Completa tus datos de entrega</h1>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 text-md-end text-secondary small"><i class="bi bi-shield-check text-success me-1"></i> Tus datos se usan solo para procesar este pedido.</div>
         </div>
 
-        <div class="row g-4">
-            <!-- COLUMNA IZQUIERDA: FORMULARIO -->
+        <div class="checkout-steps mb-4" aria-label="Progreso de compra">
+            <span class="checkout-step done"><i class="bi bi-check-lg"></i>Carrito</span><span class="checkout-step-separator"></span>
+            <span class="checkout-step current"><i>2</i>Entrega</span><span class="checkout-step-separator"></span>
+            <span class="checkout-step"><i>3</i>Pago seguro</span>
+        </div>
+
+        <div class="row g-4 align-items-start">
             <div class="col-lg-7">
-                <div class="card checkout-card shadow-sm p-4">
-                    <h3 class="fw-bold mb-4">Datos de Despacho</h3>
-                    
-                    <form method="POST">
-                        {% csrf_token %}
-                        
-                        <!-- Si hay errores generales del formulario -->
-                        {% if form.non_field_errors %}
-                        <div class="alert alert-danger rounded-3">
-                            {{ form.non_field_errors }}
-                        </div>
-                        {% endif %}
+                <section class="card form-card">
+                    <div class="card-body p-4 p-lg-5">
+                        <form method="post" novalidate>
+                            {% csrf_token %}
+                            {% if form.non_field_errors %}
+                                <div class="alert alert-danger rounded-3">{{ form.non_field_errors }}</div>
+                            {% endif %}
 
-                        <div class="row g-3">
-                            <!-- RUT -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">RUT (Sin puntos, con guion)</label>
-                                {{ form.rut }}
-                                {% if form.rut.errors %}
-                                    <div class="error-message"><i class="bi bi-exclamation-circle me-1"></i>{{ form.rut.errors|striptags }}</div>
-                                {% endif %}
-                            </div>
-                            
-                            <!-- Nombre -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Nombre Completo</label>
-                                {{ form.nombre }}
-                            </div>
-                            
-                            <!-- Teléfono -->
-                            <div class="col-md-12">
-                                <label class="form-label fw-bold">Teléfono Celular</label>
-                                {{ form.telefono }}
-                                {% if form.telefono.errors %}
-                                    <div class="error-message"><i class="bi bi-exclamation-circle me-1"></i>{{ form.telefono.errors|striptags }}</div>
-                                {% endif %}
-                            </div>
-
-                            <hr class="my-4 text-muted">
-
-                            <!-- MÉTODO DE ENTREGA -->
-                            <div class="col-md-12">
-                                <label class="form-label fw-bold text-primary"><i class="bi bi-box-seam me-2"></i>¿Cómo quieres recibir tu pedido?</label>
-                                {{ form.tipo_entrega }}
-                            </div>
-
-                            <!-- MENSAJE DE RETIRO (Oculto por defecto) -->
-                            <div class="col-md-12" id="mensaje_retiro" style="display: none;">
-                                <div class="alert alert-success d-flex align-items-center mb-0" role="alert">
-                                    <i class="bi bi-shop fs-3 me-3"></i>
-                                    <div>
-                                        <h6 class="fw-bold mb-1">Retiro en Domicilio (La Granja)</h6>
-                                        <small>Una vez confirmada la compra, te enviaremos la dirección exacta por WhatsApp para coordinar el retiro.</small>
+                            <p class="section-title mb-3"><i class="bi bi-person-vcard me-2"></i>INFORMACIÓN DE CONTACTO</p>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="field-block">
+                                        <label class="form-label fw-semibold">RUT</label>
+                                        {{ form.rut }}
+                                        <small class="text-secondary d-block mt-1">Ejemplo: 12345678-9</small>
+                                        {% if form.rut.errors %}<div class="error-message"><i class="bi bi-exclamation-circle me-1"></i>{{ form.rut.errors|striptags }}</div>{% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="field-block">
+                                        <label class="form-label fw-semibold">Nombre completo</label>
+                                        {{ form.nombre }}
+                                        {% if form.nombre.errors %}<div class="error-message"><i class="bi bi-exclamation-circle me-1"></i>{{ form.nombre.errors|striptags }}</div>{% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="field-block">
+                                        <label class="form-label fw-semibold">Teléfono celular</label>
+                                        {{ form.telefono }}
+                                        <small class="text-secondary d-block mt-1">Usaremos este número solo para coordinar tu entrega.</small>
+                                        {% if form.telefono.errors %}<div class="error-message"><i class="bi bi-exclamation-circle me-1"></i>{{ form.telefono.errors|striptags }}</div>{% endif %}
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- CAMPO DINÁMICO: DIRECCIÓN / METRO (Oculto por defecto) -->
-                            <div class="col-md-12" id="contenedor_direccion" style="display: none;">
-                                <label class="form-label fw-bold" id="label_direccion">Dirección</label>
-                                {{ form.direccion }}
-                                {% if form.direccion.errors %}
-                                    <div class="error-message"><i class="bi bi-exclamation-circle me-1"></i>{{ form.direccion.errors|striptags }}</div>
-                                {% endif %}
-                            </div>
-
-                            <!-- CHECKBOX LEGAL -->
-                            <div class="col-12 mt-4">
-                                <div class="form-check bg-light p-3 rounded-3 border">
-                                    {{ form.aceptar_terminos }}
-                                    <label class="form-check-label ms-2 small" for="{{ form.aceptar_terminos.id_for_label }}">
-                                        {{ form.aceptar_terminos.label }}
-                                    </label>
+                            <hr class="my-4">
+                            <p class="section-title mb-3"><i class="bi bi-truck me-2"></i>ENTREGA</p>
+                            <div class="field-block mb-3">
+                                <label class="form-label fw-semibold">¿Cómo quieres recibir tu pedido?</label>
+                                {{ form.tipo_entrega }}
+                                {% if form.tipo_entrega.errors %}<div class="error-message">{{ form.tipo_entrega.errors|striptags }}</div>{% endif %}
+                                <div class="small text-secondary mt-3 pt-2 border-top">
+                                    {% for codigo, opcion in opciones_entrega.items %}
+                                        <span class="d-block"><strong>{{ opcion.nombre }}:</strong> {% if opcion.tarifa %}{{ opcion.tarifa }}{% else %}${{ opcion.costo }}{% endif %} · {{ opcion.plazo }}</span>
+                                    {% endfor %}
                                 </div>
                             </div>
 
-                            <!-- BOTÓN PAGAR -->
-                            <div class="col-12 mt-4">
-                                <button type="submit" class="btn btn-primary w-100 py-3 fw-bold fs-5 rounded-pill">
-                                    Confirmar y Procesar Pago <i class="bi bi-lock-fill ms-2"></i>
-                                </button>
+                            <div id="mensaje_retiro" class="secure-note p-3 d-none mb-3">
+                                <div class="d-flex gap-3"><i class="bi bi-shop fs-4"></i><div><strong>Retiro en La Granja</strong><br><small>Tras confirmar el pago, coordinaremos la dirección exacta por WhatsApp.</small></div></div>
                             </div>
-                        </div>
-                    </form>
-                </div>
+
+                            <div id="contenedor_estacion_metro" class="field-block mb-3 d-none">
+                                <label class="form-label fw-semibold" for="selector_estacion_metro"><i class="bi bi-train-lightrail-front me-2 text-primary"></i>Estación de Metro</label>
+                                {{ form.estacion_metro }}
+                                <small class="text-secondary d-block mt-1">Elige la estación donde la vendedora realizará la entrega personal.</small>
+                                {% if form.estacion_metro.errors %}<div class="error-message"><i class="bi bi-exclamation-circle me-1"></i>{{ form.estacion_metro.errors|striptags }}</div>{% endif %}
+                            </div>
+
+                            <div id="contenedor_direccion" class="field-block mb-3 d-none">
+                                <label class="form-label fw-semibold" id="label_direccion"><i class="bi bi-geo-alt-fill me-2 text-danger"></i>Dirección completa</label>
+                                {{ form.direccion }}
+                                {% if form.direccion.errors %}<div class="error-message"><i class="bi bi-exclamation-circle me-1"></i>{{ form.direccion.errors|striptags }}</div>{% endif %}
+                            </div>
+
+                            <div class="form-check secure-note p-3 mb-4">
+                                {{ form.aceptar_terminos }}
+                                <label class="form-check-label ms-2 small" for="{{ form.aceptar_terminos.id_for_label }}">{{ form.aceptar_terminos.label }}</label>
+                                {% if form.aceptar_terminos.errors %}<div class="error-message">{{ form.aceptar_terminos.errors|striptags }}</div>{% endif %}
+                            </div>
+
+                            <button type="submit" class="btn btn-primary pay-button w-100 fw-bold fs-5">Ir a pagar de forma segura <i class="bi bi-arrow-right-circle ms-2"></i></button>
+                            <p class="small text-center text-secondary mb-0 mt-3"><i class="bi bi-clock me-1"></i>Al continuar se reservarán tus tallas durante 15 minutos, solo mientras se confirma el pago.</p>
+                            <p class="small text-center mb-0 mt-2"><a href="{% url 'politicas_despacho' %}" class="text-decoration-none">Ver despacho, plazos, retrasos y boleta</a></p>
+                        </form>
+                    </div>
+                </section>
             </div>
 
-            <!-- COLUMNA DERECHA: RESUMEN DE COMPRA -->
             <div class="col-lg-5">
-                <div class="card resumen-card shadow p-4 sticky-top" style="top: 20px;">
-                    <h4 class="fw-bold mb-4">Tu Carrito</h4>
-                    
-                    <div class="d-flex flex-column gap-3 mb-4">
-                        {% for key, item in carrito.items %}
-                        <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2">
-                            <div>
-                                <h6 class="mb-0 fw-bold">{{ item.nombre }}</h6>
-                                <small class="text-secondary">Cant: {{ item.cantidad }} | SKU: {{ item.sku }}</small>
-                            </div>
-                            <span class="fw-bold text-success">${{ item.precio }}</span>
+                <aside class="card summary-card sticky-top" style="top: 20px;">
+                    <div class="card-body p-4 p-lg-5">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <div><p class="section-title text-white-50 mb-1">RESUMEN</p><h2 class="h4 fw-bold mb-0">Tu compra</h2></div>
+                            <span class="badge rounded-pill text-bg-light text-dark">{{ carrito|length }} producto{{ carrito|length|pluralize }}</span>
                         </div>
-                        {% endfor %}
-                    </div>
 
-                    <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-secondary">
-                        <span class="fs-5">Total a Pagar:</span>
-                        <span class="fs-3 fw-bold text-success">${{ total }}</span>
+                        {% if carrito_expira_en_timestamp %}
+                            <div id="cart-timer" class="timer-box p-3 mb-4" data-expira-en="{{ carrito_expira_en_timestamp }}">
+                                <div class="d-flex justify-content-between align-items-center"><span class="small"><i class="bi bi-clock-history me-1"></i> Carrito activo</span><strong class="timer-value" data-timer-value>--:--</strong></div>
+                                <small class="d-block text-white-50 mt-1">Tienes {{ carrito_duracion_horas }} horas desde tu último cambio. El stock final se confirma al pagar.</small>
+                            </div>
+                        {% endif %}
+
+                        <div class="mb-4">
+                            {% for key, item in carrito.items %}
+                                <div class="cart-item d-flex gap-3 py-3">
+                                    {% if item.imagen_url %}<img src="{{ item.imagen_url }}" alt="" class="item-thumb">{% else %}<div class="item-thumb d-flex align-items-center justify-content-center"><i class="bi bi-image text-white-50"></i></div>{% endif %}
+                                    <div class="flex-grow-1"><h3 class="h6 mb-1 fw-semibold">{{ item.nombre }}</h3><small class="text-white-50">Talla {{ item.talla }} · {{ item.cantidad }} unidad{{ item.cantidad|pluralize }}</small></div>
+                                    <strong class="text-nowrap">${% widthratio item.precio 1 item.cantidad %}</strong>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div id="resumen-entrega" class="delivery-preview p-3 mb-4" data-subtotal="{{ subtotal_productos }}">
+                            <div class="d-flex align-items-start gap-2"><i class="bi bi-truck fs-5 text-info"></i><div class="flex-grow-1"><strong id="resumen-entrega-titulo">Selecciona una modalidad</strong><p id="resumen-entrega-plazo" class="small text-white-50 mb-0">Verás aquí costo, plazo estimado y cómo seguir tu despacho.</p></div></div>
+                            <div class="d-flex justify-content-between small mt-3"><span>Productos</span><strong id="resumen-subtotal">${{ subtotal_productos }}</strong></div>
+                            <div class="d-flex justify-content-between small mt-2"><span>Despacho</span><strong id="resumen-costo">—</strong></div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center border-top border-secondary pt-4 mb-4"><span class="fs-5">Total final</span><strong id="resumen-total" class="fs-2 text-success">{% if entrega_previsualizada %}${{ total }}{% else %}—{% endif %}</strong></div>
+                        <div class="d-flex align-items-center gap-2 text-white-50 small"><i class="bi bi-lock-fill text-success"></i> El pago se confirma directamente con Mercado Pago.</div>
                     </div>
-                </div>
+                </aside>
             </div>
-            
         </div>
-    </div>
+    </main>
 
-    <!-- SCRIPT MÁGICO: DINAMISMO DEL FORMULARIO -->
+    {{ opciones_entrega|json_script:"opciones-entrega" }}
+    {{ estaciones_metro|json_script:"estaciones-metro" }}
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Conectamos JavaScript con los IDs de los campos de Django
+        document.addEventListener('DOMContentLoaded', function () {
             const selector = document.getElementById('selector_entrega');
             const divDireccion = document.getElementById('contenedor_direccion');
+            const divEstacionMetro = document.getElementById('contenedor_estacion_metro');
             const inputDireccion = document.getElementById('campo_direccion');
             const labelDireccion = document.getElementById('label_direccion');
             const divRetiro = document.getElementById('mensaje_retiro');
+            const opcionesEntrega = JSON.parse(document.getElementById('opciones-entrega').textContent);
+            const selectorEstacion = document.getElementById('selector_estacion_metro');
+            const estacionesMetro = JSON.parse(document.getElementById('estaciones-metro').textContent);
+            const resumenEntrega = document.getElementById('resumen-entrega');
+            const formatoPesos = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
 
             function actualizarVista() {
                 const valor = selector.value;
-
+                divDireccion.classList.toggle('d-none', valor !== 'Delivery');
+                divEstacionMetro.classList.toggle('d-none', valor !== 'Metro');
+                divRetiro.classList.toggle('d-none', valor !== 'Retiro');
                 if (valor === 'Retiro') {
-                    divDireccion.style.display = 'none';
-                    divRetiro.style.display = 'block';
-                    inputDireccion.value = 'Retiro en domicilio (La Granja)'; // Texto automático para la Base de Datos
-
+                    inputDireccion.value = 'Retiro en domicilio (La Granja)';
                 } else if (valor === 'Metro') {
-                    divDireccion.style.display = 'block';
-                    divRetiro.style.display = 'none';
-                    labelDireccion.innerHTML = '<i class="bi bi-train-lightrail-front me-2 text-primary"></i>¿En qué Estación de Metro?';
-                    inputDireccion.placeholder = 'Ej: L4A - Estación Santa Rosa';
-                    if(inputDireccion.value === 'Retiro en domicilio (La Granja)') inputDireccion.value = '';
-
+                    if (inputDireccion.value === 'Retiro en domicilio (La Granja)') inputDireccion.value = '';
                 } else if (valor === 'Delivery') {
-                    divDireccion.style.display = 'block';
-                    divRetiro.style.display = 'none';
-                    labelDireccion.innerHTML = '<i class="bi bi-geo-alt-fill me-2 text-danger"></i>Dirección Completa (Starken/Chilexpress)';
+                    labelDireccion.innerHTML = '<i class="bi bi-geo-alt-fill me-2 text-danger"></i>Dirección completa';
                     inputDireccion.placeholder = 'Ej: Pasaje Los Cántaros 123, Comuna';
-                    if(inputDireccion.value === 'Retiro en domicilio (La Granja)') inputDireccion.value = '';
+                    if (inputDireccion.value === 'Retiro en domicilio (La Granja)') inputDireccion.value = '';
+                }
 
+                let entrega = opcionesEntrega[valor];
+                if (valor === 'Metro' && selectorEstacion.value) {
+                    const estacion = estacionesMetro[selectorEstacion.value];
+                    if (estacion) {
+                        entrega = {
+                            ...entrega,
+                            nombre: 'Entrega personal en ' + estacion.nombre + ' (' + estacion.linea + ')',
+                            costo: estacion.costo,
+                            plazo: entrega.plazo + ' ' + estacion.kilometros + ' km desde Universidad de Chile.',
+                            seguimiento: 'La vendedora coordinará la estación y hora por WhatsApp.',
+                        };
+                    } else {
+                        entrega = null;
+                    }
+                } else if (valor === 'Metro') {
+                    entrega = null;
+                }
+                const titulo = document.getElementById('resumen-entrega-titulo');
+                const plazo = document.getElementById('resumen-entrega-plazo');
+                const costo = document.getElementById('resumen-costo');
+                const total = document.getElementById('resumen-total');
+                if (entrega) {
+                    titulo.textContent = entrega.nombre;
+                    plazo.textContent = entrega.plazo + ' ' + entrega.seguimiento;
+                    costo.textContent = formatoPesos.format(entrega.costo);
+                    costo.classList.add('delivery-cost');
+                    total.textContent = formatoPesos.format(Number(resumenEntrega.dataset.subtotal) + entrega.costo);
                 } else {
-                    // Si no ha seleccionado nada
-                    divDireccion.style.display = 'none';
-                    divRetiro.style.display = 'none';
+                    titulo.textContent = 'Selecciona una modalidad';
+                    plazo.textContent = 'Verás aquí costo, plazo estimado y cómo seguir tu despacho.';
+                    costo.textContent = '—';
+                    costo.classList.remove('delivery-cost');
+                    total.textContent = '—';
                 }
             }
 
-            // Escuchar cada vez que el cliente cambia la opción
-            selector.addEventListener('change', actualizarVista);
-            
-            // Ejecutar al cargar la página (por si hay algún error de validación y la página se recarga)
-            actualizarVista();
+            if (selector) { selector.addEventListener('change', actualizarVista); actualizarVista(); }
+            if (selectorEstacion) selectorEstacion.addEventListener('change', actualizarVista);
+
+            const timer = document.getElementById('cart-timer');
+            if (timer) {
+                const salida = '{% url "ver_carrito" %}';
+                const destino = Number(timer.dataset.expiraEn) * 1000;
+                const salidaTimer = timer.querySelector('[data-timer-value]');
+                function actualizarTemporizador() {
+                    const restante = Math.max(0, Math.ceil((destino - Date.now()) / 1000));
+                    const minutos = String(Math.floor(restante / 60)).padStart(2, '0');
+                    const segundos = String(restante % 60).padStart(2, '0');
+                    salidaTimer.textContent = minutos + ':' + segundos;
+                    if (restante <= 0) window.location.assign(salida);
+                }
+                actualizarTemporizador();
+                window.setInterval(actualizarTemporizador, 1000);
+            }
         });
     </script>
-
 </body>
 </html>
