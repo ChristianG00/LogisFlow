@@ -10,6 +10,8 @@ urlpatterns = [
     path('recomendador/', motor_recomendacion, name='recomendador'),
     path('cuenta/registro/', views.registro_cliente, name='registro_cliente'),
     path('cuenta/ingresar/', views.iniciar_sesion_cliente, name='iniciar_sesion_cliente'),
+    path('cuenta/recuperar-clave/', views.solicitar_recuperacion_clave_cliente, name='recuperar_clave_cliente'),
+    path('cuenta/restablecer-clave/<uidb64>/<token>/', views.restablecer_clave_cliente, name='restablecer_clave_cliente'),
     path('cuenta/salir/', views.cerrar_sesion_cliente, name='cerrar_sesion_cliente'),
     path('mi-cuenta/', views.mi_cuenta, name='mi_cuenta'),
     path('mi-cuenta/direccion/', views.actualizar_direccion_cliente, name='actualizar_direccion_cliente'),
@@ -33,7 +35,7 @@ urlpatterns = [
     path('politica-de-privacidad/', views.politica_privacidad, name='politica_privacidad'),
     path('webhook/', views.webhook_mercadopago, name='webhook_mercadopago'),
     
-    # Rutas administrativas (vistas de la dueña)
+    # Rutas administrativas (Aquí están todas las de la dueña)
     path('dashboard/', views.dashboard, name='dashboard'),
     path('dashboard/pedido/actualizar/', views.actualizar_estado_pedido, name='actualizar_estado_pedido'),
     path('dashboard/privacidad/<int:solicitud_id>/resolver/', views.resolver_solicitud_privacidad, name='resolver_solicitud_privacidad'),
@@ -41,7 +43,7 @@ urlpatterns = [
     path('dashboard/producto/eliminar/<int:producto_id>/', views.eliminar_producto, name='eliminar_producto'),
     path('dashboard/producto/talla/guardar/', views.guardar_talla, name='guardar_talla'),
     
-    # Rutas de exportacion de datos
+    # --- LA RUTA QUE FALTABA PARA EL EXCEL ---
     path('dashboard/exportar/', views.exportar_excel, name='exportar_excel'), 
     
     # Login / Logout

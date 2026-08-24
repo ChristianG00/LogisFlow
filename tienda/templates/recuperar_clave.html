@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recuperar contraseña · LogisFlow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root { --ink:#34233d; --brand:#b4487a; --brand-dark:#93365f; }
+        body { min-height:100vh; color:var(--ink); background:radial-gradient(circle at 5% 8%,#fbe2ee 0,transparent 30rem),radial-gradient(circle at 95% 88%,#e8d8f2 0,transparent 28rem),#fcf7fa; }
+        .shell { max-width:920px; } .card-reset { overflow:hidden; border:0; border-radius:26px; box-shadow:0 20px 54px rgba(75,36,64,.14); }
+        .side { color:#fff; background:linear-gradient(145deg,#34233d,#7c3f69 63%,#b4487a); } .brand { color:var(--brand); }
+        .badge-soft { display:inline-flex; gap:.45rem; align-items:center; padding:.45rem .7rem; border:1px solid rgba(255,255,255,.25); border-radius:999px; background:rgba(255,255,255,.1); font-size:.74rem; font-weight:800; letter-spacing:.06em; }
+        .form-control { min-height:48px; border-radius:11px; border-color:#dcdde6; } .form-control:focus { border-color:#d67da7; box-shadow:0 0 0 .2rem rgba(180,72,122,.13); }
+        .btn-primary { --bs-btn-bg:#b4487a; --bs-btn-border-color:#b4487a; --bs-btn-hover-bg:#93365f; --bs-btn-hover-border-color:#93365f; }
+        .footer { color:#bdb3be; background:var(--ink); } .footer a { color:#f0c6d9; text-decoration:none; } .footer a:hover { color:#fff; }
+    </style>
+</head>
+<body class="d-flex flex-column">
+    <main class="container shell flex-grow-1 d-flex align-items-center py-4 py-lg-5">
+        <section class="card card-reset w-100">
+            <div class="row g-0 align-items-stretch">
+                <aside class="col-md-5 side p-4 p-lg-5 d-flex flex-column justify-content-between">
+                    <div><a href="{% url 'catalogo' %}" class="text-white text-decoration-none fw-bold"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a><p class="mt-5 mb-3"><span class="badge-soft"><i class="bi bi-shield-lock"></i>ACCESO SEGURO</span></p><h1 class="h2 fw-bold mb-3">Recupera el acceso.</h1><p class="text-white-50 mb-0">Te enviaremos un enlace temporal para crear una nueva contraseña. Nunca pediremos tu clave actual.</p></div>
+                    <p class="small text-white-50 mb-0"><i class="bi bi-envelope-check me-1"></i>El enlace llegará solo al correo de tu cuenta.</p>
+                </aside>
+                <section class="col-md-7 p-4 p-lg-5">
+                    <p class="small fw-bold brand mb-2">RECUPERAR CONTRASEÑA</p>
+                    <h2 class="h3 fw-bold mb-2">¿No recuerdas tu clave?</h2>
+                    <p class="text-secondary small mb-4">Ingresa tu correo. Por seguridad, mostraremos el mismo mensaje aunque no exista una cuenta asociada.</p>
+                    {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags|default:'danger' }} rounded-3 small">{{ message }}</div>{% endfor %}{% endif %}
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        <div class="mb-4"><label class="form-label fw-semibold" for="{{ form.email.id_for_label }}">Correo electrónico</label>{{ form.email }}{% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors|striptags }}</div>{% endif %}</div>
+                        <button class="btn btn-primary w-100 fw-bold py-3" type="submit">Enviar enlace de recuperación <i class="bi bi-send ms-1"></i></button>
+                    </form>
+                    <p class="text-center small text-secondary mt-4 mb-0"><a class="brand fw-semibold text-decoration-none" href="{% url 'iniciar_sesion_cliente' %}"><i class="bi bi-arrow-left me-1"></i>Volver a iniciar sesión</a></p>
+                </section>
+            </div>
+        </section>
+    </main>
+    <footer class="footer py-4"><div class="container shell d-flex flex-wrap justify-content-between gap-2 small"><span><strong class="text-white">LOGISFLOW</strong> · Moda femenina, compra y despacho con información clara.</span><div class="d-flex gap-3"><a href="{% url 'politicas_despacho' %}">Despacho</a><a href="{% url 'terminos_condiciones' %}">Términos y privacidad</a></div></div></footer>
+</body>
+</html>

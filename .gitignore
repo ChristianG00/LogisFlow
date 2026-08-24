@@ -1,4 +1,4 @@
-# Entornos virtuales
+
 venv/
 env/
 .venv/
@@ -7,5 +7,4 @@ env/
 __pycache__/
 *.pyc
 
-# Variables de entorno y secretos
 .env

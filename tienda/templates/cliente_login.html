@@ -47,6 +47,13 @@
 </head>
 <body class="d-flex flex-column">
     <main class="container auth-shell flex-grow-1 d-flex align-items-center py-4 py-lg-5">
+        {% if messages %}
+            <div class="position-fixed top-0 start-50 translate-middle-x mt-3" style="z-index: 1080; width: min(94vw, 720px);">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible shadow-sm rounded-3 mb-2" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+                {% endfor %}
+            </div>
+        {% endif %}
         <section id="auth-card" class="auth-card {% if modo_auth == 'registro' %}is-register{% endif %}">
             <div class="row g-0 align-items-stretch">
                 <aside class="col-md-5 auth-side p-4 p-lg-5 d-flex flex-column justify-content-between">
@@ -54,7 +61,7 @@
                         <a href="{% url 'catalogo' %}" class="text-white text-decoration-none fw-bold"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a>
                         <p class="mt-5 mb-3"><span class="auth-badge"><i class="bi bi-person-heart"></i>CUENTA CLIENTE</span></p>
                         <h1 class="h2 fw-bold mb-3">Una cuenta, un solo acceso.</h1>
-                        <p class="text-white-50 mb-0">Ingresa si ya tienes cuenta o crea una desde este mismo panel. Recuerda que comprar como invitada sigue siendo una opción.</p>
+                        <p class="text-white-50 mb-0">Ingresa si ya tienes cuenta o crea una desde este mismo panel. Comprar como invitada sigue siendo una opción.</p>
                     </div>
                     <p class="auth-side-content small text-white-50 mb-0"><i class="bi bi-shield-check me-1"></i>Solicitamos solo los datos necesarios para tu cuenta y compras.</p>
                 </aside>
@@ -73,7 +80,7 @@
                                 <div class="mb-4"><label class="form-label fw-semibold" for="{{ formulario_ingreso.password.id_for_label }}">Contraseña</label>{{ formulario_ingreso.password }}{% if formulario_ingreso.password.errors %}<div class="text-danger small mt-1">{{ formulario_ingreso.password.errors|striptags }}</div>{% endif %}</div>
                                 <button type="submit" class="btn btn-primary w-100 fw-bold py-3">Ingresar a mi cuenta <i class="bi bi-arrow-right ms-1"></i></button>
                             </form>
-                            <p class="text-center small text-secondary mt-4 mb-0">¿Aún no tienes cuenta? <button class="switch-button" type="button" data-auth-target="registro">Crear cuenta</button>.</p>
+                            <div class="d-flex flex-wrap justify-content-between gap-2 mt-4 small"><a class="brand fw-semibold text-decoration-none" href="{% url 'recuperar_clave_cliente' %}">¿Olvidaste tu contraseña?</a><span class="text-secondary">¿Aún no tienes cuenta? <button class="switch-button" type="button" data-auth-target="registro">Crear cuenta</button>.</span></div>
                         </div>
 
                         <div class="auth-panel" id="panel-registro">
@@ -104,6 +111,7 @@
         </section>
     </main>
     <footer class="auth-footer py-4"><div class="container auth-shell d-flex flex-wrap justify-content-between align-items-center gap-2"><span class="small"><strong class="text-white">LOGISFLOW</strong> · Moda femenina, compra y despacho con información clara.</span><div class="d-flex flex-wrap gap-3 small"><a href="{% url 'politicas_despacho' %}">Despacho</a><a href="{% url 'terminos_condiciones' %}">Términos y privacidad</a><a href="{% url 'seguimiento' %}">Seguimiento</a><a href="{% url 'login' %}"><i class="bi bi-shield-lock me-1"></i>Administración</a></div></div></footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         (() => {
             const card = document.getElementById('auth-card');

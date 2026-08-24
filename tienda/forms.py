@@ -9,7 +9,7 @@ from .models import Cliente, Producto, SolicitudPrivacidad, VarianteProducto
 
 
 def normalizar_rut(rut):
-    #Valida el digito verificador y devuelve en formato 12345678-9
+    """Valida el dígito verificador y devuelve el formato canónico 12345678-9."""
     rut_limpio = re.sub(r'[.\-\s]', '', str(rut)).upper()
     if not re.fullmatch(r'\d{7,8}[0-9K]', rut_limpio):
         raise ValueError('El formato del RUT no es válido.')
@@ -100,7 +100,10 @@ class CheckoutForm(forms.Form):
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
 
-# Validaciones
+    # ==========================================
+    # VALIDACIONES ESTRICTAS (NIVEL TESIS)
+    # ==========================================
+
     def clean_rut(self):
         try:
             return normalizar_rut(self.cleaned_data.get('rut', ''))
@@ -167,7 +170,7 @@ class CheckoutForm(forms.Form):
 
 
 class ProductoForm(forms.ModelForm):
-    # Valida el inventario antes de guardarlo, no confía en los campos HTML
+    """Valida el inventario antes de guardarlo; no confía en los campos HTML."""
 
     class Meta:
         model = Producto
@@ -337,6 +340,54 @@ class AccesoClienteForm(forms.Form):
             return normalizar_telefono(identificador)
         except ValidationError:
             raise ValidationError('Ingresa un correo electrónico válido o un celular chileno de 9 dígitos.')
+
+
+class SolicitudRecuperacionClaveClienteForm(forms.Form):
+    email = forms.EmailField(
+        max_length=254,
+        error_messages={
+            'required': 'Ingresa el correo con el que creaste tu cuenta.',
+            'invalid': 'Ingresa un correo electrónico válido, por ejemplo nombre@correo.cl.',
+        },
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control', 'placeholder': 'nombre@correo.cl', 'autocomplete': 'email',
+        }),
+    )
+
+    def clean_email(self):
+        return normalizar_email(self.cleaned_data.get('email', ''))
+
+
+class RestablecerClaveClienteForm(forms.Form):
+    password1 = forms.CharField(
+        error_messages={'required': 'Crea una nueva contraseña.'},
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control', 'autocomplete': 'new-password', 'placeholder': 'Mínimo 10 caracteres',
+        }),
+    )
+    password2 = forms.CharField(
+        error_messages={'required': 'Repite la nueva contraseña.'},
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control', 'autocomplete': 'new-password', 'placeholder': 'Repite tu contraseña',
+        }),
+    )
+
+    def __init__(self, *args, usuario=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.usuario = usuario
+
+    def clean(self):
+        cleaned = super().clean()
+        password1, password2 = cleaned.get('password1'), cleaned.get('password2')
+        if password1 and password2:
+            if password1 != password2:
+                self.add_error('password2', 'Las contraseñas no coinciden.')
+            else:
+                try:
+                    validate_password(password1, user=self.usuario)
+                except ValidationError as error:
+                    self.add_error('password1', error)
+        return cleaned
 
 
 class DireccionClienteForm(forms.ModelForm):

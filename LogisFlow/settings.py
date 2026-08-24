@@ -145,3 +145,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_REDIRECT_URL = 'dashboard'  # A dónde ir si la clave es correcta
 LOGOUT_REDIRECT_URL = 'catalogo'  # A dónde ir al cerrar sesión
 LOGIN_URL = 'login'
+
+# CONFIGURACIÓN DE ENVÍO DE CORREOS 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+# Llama a las credenciales secretas 
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+
+# El nombre del remitente que vera la clienta cuando le llegue el correo
+DEFAULT_FROM_EMAIL = f"LogisFlow Tienda <{EMAIL_HOST_USER}>"

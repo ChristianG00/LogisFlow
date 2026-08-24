@@ -10,14 +10,18 @@ import mercadopago
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.tokens import default_token_generator
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import F
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.encoding import force_bytes, force_str
 from django.utils import timezone
-from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.http import url_has_allowed_host_and_scheme, urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -26,7 +30,9 @@ from .forms import (
     CheckoutForm,
     DireccionClienteForm,
     ProductoForm,
+    RestablecerClaveClienteForm,
     RegistroClienteForm,
+    SolicitudRecuperacionClaveClienteForm,
     SolicitudPrivacidadForm,
     TallaForm,
     normalizar_rut,
@@ -46,7 +52,8 @@ MAX_CANTIDAD_POR_LINEA = 1000
 CARRITO_DURACION_MINUTOS = 15
 RESERVA_DURACION_MINUTOS = 15
 
-# Las catagorias se mantienen para productos antiguos pero NO se muestran secciones duplicadas
+# Las categorías generales se conservan para los productos antiguos, pero no se
+# muestran como secciones duplicadas en la tienda pública.
 CATEGORIAS_CATALOGO = (
     ('POLERAS', 'Poleras y tops', ('POLERAS', 'SUPERIOR')),
     ('BLUSAS', 'Blusas', ('BLUSAS',)),
@@ -96,6 +103,7 @@ def _nombre_usuario_cliente():
 
 
 def _nuevo_desafio_registro(request):
+    """CAPTCHA de selección aleatoria, validado contra la respuesta guardada en sesión."""
     opciones = (
         ('bus', '🚌 Autobús', 'transporte'),
         ('bicicleta', '🚲 Bicicleta', 'transporte'),
@@ -128,7 +136,7 @@ def _nuevo_desafio_registro(request):
 
 
 def _desafio_registro_vigente(request, renovar=False):
-    # Obtiene el desafio de registro de la sesion sin cambiarlo al corregir un formulario
+    """Obtiene el desafío de registro de la sesión sin cambiarlo al corregir un formulario."""
     desafio = request.session.get('desafio_registro')
     if (
         renovar
@@ -148,7 +156,7 @@ def _mostrar_acceso_cliente(
     desafio=None,
     modo='ingreso',
 ):
-    # Muestra ingreso y registro en un unico panel de cuenta de cliente
+    """Muestra ingreso y registro en un único panel de cuenta de cliente."""
     desafio = desafio or _desafio_registro_vigente(request)
     return render(request, 'cliente_login.html', {
         'formulario_ingreso': formulario_ingreso or AccesoClienteForm(prefix='ingreso'),
@@ -173,7 +181,7 @@ def _cantidad_valida(valor):
 
 
 def _normalizar_carrito(carrito):
-    # Reconstruye el carrito con datos actuales de la BD, nunca con precios del cliente
+    """Reconstruye el carrito con datos actuales de la BD, nunca con precios del cliente."""
     if not isinstance(carrito, dict) or not carrito:
         raise CarritoInvalido('El carrito está vacío o tiene un formato inválido.')
 
@@ -238,7 +246,7 @@ def _normalizar_carrito(carrito):
 
 
 def _obtener_carrito_vigente(request):
-    # La expiracion se aplica en servidor incluso si el JavaScript no se ejecuta
+    """La expiración se aplica en servidor incluso si el JavaScript no se ejecuta."""
     carrito = request.session.get('carrito', {})
     expiracion = request.session.get('carrito_expira_en')
     duracion_guardada = request.session.get('carrito_duracion_minutos')
@@ -251,7 +259,7 @@ def _obtener_carrito_vigente(request):
         expiracion = None
 
     ahora = int(timezone.now().timestamp())
-
+    # Los carros creados con la antigua regla de 24 h no conservan su vigencia.
     if carrito and (
         duracion_guardada != CARRITO_DURACION_MINUTOS
         or expiracion is None
@@ -280,7 +288,7 @@ def _guardar_carrito(request, carrito, reiniciar_expiracion=False):
 
 
 def _items_de_pago(pago):
-   # Devuelve las tallas y cantidades existidas por el servidor en un intento de pago
+    """Devuelve las tallas y cantidades persistidas por el servidor en un intento de pago."""
     try:
         items = pago.items
         if not isinstance(items, list) or not items:
@@ -302,7 +310,7 @@ def _items_de_pago(pago):
 
 
 def _liberar_reserva_bloqueada(pago, estado):
-    # Libera una reserva  el PagoPendiente debe venir bloqueado dentro de una transaccion
+    """Libera una reserva; el PagoPendiente debe venir bloqueado dentro de una transacción."""
     if not pago.reserva_activa:
         return
     try:
@@ -329,7 +337,7 @@ def _liberar_reserva_bloqueada(pago, estado):
 
 
 def _liberar_reservas_expiradas():
-    #Devuelve inventario retenido cuando Mercado Pago ya no debe usar esa preferencia
+    """Devuelve inventario retenido cuando Mercado Pago ya no debe usar esa preferencia."""
     with transaction.atomic():
         pagos = list(
             PagoPendiente.objects.select_for_update().filter(
@@ -343,7 +351,7 @@ def _liberar_reservas_expiradas():
 
 
 def _crear_pago_con_reserva(form, items, subtotal, entrega):
-    #Reserva las tallas por 15 minutos antes de redirigir al PSP
+    """Reserva las tallas por 15 minutos antes de redirigir al PSP."""
     _liberar_reservas_expiradas()
     with transaction.atomic():
         ids = [item['variante_id'] for item in items]
@@ -418,7 +426,7 @@ def _extraer_id_pago(request):
 
 
 def _confirmar_pago(payment_id, referencia):
-    # Verifica el pago contra Mercado Pago y crea el pedido de manera inmmediata
+    """Verifica el pago contra Mercado Pago y crea el pedido de manera atómica."""
     if not re.fullmatch(r'\d{1,100}', str(payment_id)):
         raise PagoNoConfirmado('El identificador de pago no es válido.')
     try:
@@ -440,7 +448,7 @@ def _confirmar_pago(payment_id, referencia):
         raise PagoNoConfirmado('Mercado Pago informó un monto inválido.')
 
     with transaction.atomic():
-        pago = PagoPendiente.objects.select_for_update(of=('self',)).select_related('pedido').get(referencia=referencia)
+        pago = PagoPendiente.objects.select_for_update().select_related('pedido').get(referencia=referencia)
         if pago.pedido_id:
             if pago.mercadopago_payment_id != str(payment_id):
                 raise PagoNoConfirmado('El pago no corresponde a esta compra.')
@@ -649,6 +657,81 @@ def iniciar_sesion_cliente(request):
         formulario_ingreso=form,
         modo='ingreso',
     )
+
+
+def solicitar_recuperacion_clave_cliente(request):
+    """Envía un enlace temporal de recuperación solo a cuentas de cliente."""
+    if request.user.is_authenticated:
+        return redirect('mi_cuenta' if _perfil_cliente(request) else 'catalogo')
+
+    form = SolicitudRecuperacionClaveClienteForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        cliente = Cliente.objects.select_related('usuario').filter(
+            email__iexact=form.cleaned_data['email'],
+            anonimizado_en__isnull=True,
+            usuario__is_active=True,
+            usuario__is_staff=False,
+        ).first()
+        if cliente and cliente.usuario_id:
+            usuario = cliente.usuario
+            uidb64 = urlsafe_base64_encode(force_bytes(usuario.pk))
+            token = default_token_generator.make_token(usuario)
+            enlace = request.build_absolute_uri(reverse(
+                'restablecer_clave_cliente',
+                kwargs={'uidb64': uidb64, 'token': token},
+            ))
+            try:
+                send_mail(
+                    subject='Restablece tu contraseña de LogisFlow',
+                    message=(
+                        f'Hola {cliente.nombre},\n\n'
+                        'Recibimos una solicitud para restablecer la contraseña de tu cuenta cliente. '
+                        'Usa este enlace temporal para crear una nueva contraseña:\n\n'
+                        f'{enlace}\n\n'
+                        'Si no solicitaste este cambio, puedes ignorar este correo. '
+                        'Tu contraseña actual seguirá protegida.'
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[cliente.email],
+                    fail_silently=False,
+                )
+            except Exception:
+                logger.exception('No fue posible enviar el correo de recuperación de contraseña.')
+                messages.error(request, 'No pudimos enviar el correo en este momento. Inténtalo nuevamente más tarde.')
+                return render(request, 'recuperar_clave.html', {'form': form})
+
+        # La misma respuesta evita confirmar si una dirección tiene cuenta registrada.
+        messages.success(request, 'Si el correo corresponde a una cuenta cliente, recibirás un enlace temporal para restablecer tu contraseña.')
+        return redirect('iniciar_sesion_cliente')
+
+    return render(request, 'recuperar_clave.html', {'form': form})
+
+
+def restablecer_clave_cliente(request, uidb64, token):
+    """Valida el token de Django y permite definir una nueva contraseña de cliente."""
+    cliente = None
+    try:
+        usuario_id = force_str(urlsafe_base64_decode(uidb64))
+        cliente = Cliente.objects.select_related('usuario').filter(
+            usuario_id=usuario_id,
+            anonimizado_en__isnull=True,
+            usuario__is_active=True,
+            usuario__is_staff=False,
+        ).first()
+    except (TypeError, ValueError, OverflowError):
+        pass
+
+    if not cliente or not default_token_generator.check_token(cliente.usuario, token):
+        return render(request, 'restablecer_clave.html', {'enlace_invalido': True}, status=400)
+
+    form = RestablecerClaveClienteForm(request.POST or None, usuario=cliente.usuario)
+    if request.method == 'POST' and form.is_valid():
+        cliente.usuario.set_password(form.cleaned_data['password1'])
+        cliente.usuario.save(update_fields=['password'])
+        messages.success(request, 'Tu contraseña fue actualizada. Ya puedes iniciar sesión.')
+        return redirect('iniciar_sesion_cliente')
+
+    return render(request, 'restablecer_clave.html', {'form': form})
 
 
 @require_POST
