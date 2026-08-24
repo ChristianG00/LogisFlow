@@ -440,7 +440,7 @@ def _confirmar_pago(payment_id, referencia):
         raise PagoNoConfirmado('Mercado Pago informó un monto inválido.')
 
     with transaction.atomic():
-        pago = PagoPendiente.objects.select_for_update().select_related('pedido').get(referencia=referencia)
+        pago = PagoPendiente.objects.select_for_update(of=('self',)).select_related('pedido').get(referencia=referencia)
         if pago.pedido_id:
             if pago.mercadopago_payment_id != str(payment_id):
                 raise PagoNoConfirmado('El pago no corresponde a esta compra.')
