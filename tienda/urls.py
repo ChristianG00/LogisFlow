@@ -33,7 +33,7 @@ urlpatterns = [
     path('politica-de-privacidad/', views.politica_privacidad, name='politica_privacidad'),
     path('webhook/', views.webhook_mercadopago, name='webhook_mercadopago'),
     
-    # Rutas administrativas (Aquí están todas las de la dueña)
+    # Rutas administrativas (vistas de la dueña)
     path('dashboard/', views.dashboard, name='dashboard'),
     path('dashboard/pedido/actualizar/', views.actualizar_estado_pedido, name='actualizar_estado_pedido'),
     path('dashboard/privacidad/<int:solicitud_id>/resolver/', views.resolver_solicitud_privacidad, name='resolver_solicitud_privacidad'),
@@ -41,7 +41,7 @@ urlpatterns = [
     path('dashboard/producto/eliminar/<int:producto_id>/', views.eliminar_producto, name='eliminar_producto'),
     path('dashboard/producto/talla/guardar/', views.guardar_talla, name='guardar_talla'),
     
-    # --- LA RUTA QUE FALTABA PARA EL EXCEL ---
+    # Rutas de exportacion de datos
     path('dashboard/exportar/', views.exportar_excel, name='exportar_excel'), 
     
     # Login / Logout

@@ -9,7 +9,7 @@ from .models import Cliente, Producto, SolicitudPrivacidad, VarianteProducto
 
 
 def normalizar_rut(rut):
-    """Valida el dígito verificador y devuelve el formato canónico 12345678-9."""
+    #Valida el digito verificador y devuelve en formato 12345678-9
     rut_limpio = re.sub(r'[.\-\s]', '', str(rut)).upper()
     if not re.fullmatch(r'\d{7,8}[0-9K]', rut_limpio):
         raise ValueError('El formato del RUT no es válido.')
@@ -100,10 +100,7 @@ class CheckoutForm(forms.Form):
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
 
-    # ==========================================
-    # VALIDACIONES ESTRICTAS (NIVEL TESIS)
-    # ==========================================
-
+# Validaciones
     def clean_rut(self):
         try:
             return normalizar_rut(self.cleaned_data.get('rut', ''))
@@ -170,7 +167,7 @@ class CheckoutForm(forms.Form):
 
 
 class ProductoForm(forms.ModelForm):
-    """Valida el inventario antes de guardarlo; no confía en los campos HTML."""
+    # Valida el inventario antes de guardarlo, no confía en los campos HTML
 
     class Meta:
         model = Producto
