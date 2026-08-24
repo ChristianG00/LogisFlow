@@ -1,19 +1,19 @@
-"""Reglas de despacho visibles y centralizadas para el checkout."""
+# Reglas de despacho visibles y centralizadas para el checkout
 
 TARIFA_METRO_POR_KILOMETRO = 200
 
 # Recorrido habilitado para la entrega personal: Línea 1, desde Universidad de
-# Chile hasta Tobalaba. Los kilómetros se calculan desde Universidad de Chile.
+# Chile hasta Tobalaba cada tramo/kilómetro siguiente añade otros $200.
 TRAMO_METRO = (
-    ('Universidad de Chile', 0),
-    ('Santa Lucía', 1),
-    ('Universidad Católica', 2),
-    ('Baquedano', 3),
-    ('Salvador', 4),
-    ('Manuel Montt', 5),
-    ('Pedro de Valdivia', 6),
-    ('Los Leones', 7),
-    ('Tobalaba', 8),
+    ('Universidad de Chile', 1),
+    ('Santa Lucía', 2),
+    ('Universidad Católica', 3),
+    ('Baquedano', 4),
+    ('Salvador', 5),
+    ('Manuel Montt', 6),
+    ('Pedro de Valdivia', 7),
+    ('Los Leones', 8),
+    ('Tobalaba', 9),
 )
 
 ESTACIONES_METRO = {
@@ -22,6 +22,7 @@ ESTACIONES_METRO = {
         'linea': 'Línea 1',
         'kilometros': kilometros,
         'costo': kilometros * TARIFA_METRO_POR_KILOMETRO,
+        'es_tramo_inicial': kilometros == 1,
     }
     for numero, (nombre, kilometros) in enumerate(TRAMO_METRO, start=1)
 }
@@ -48,7 +49,7 @@ OPCIONES_ENTREGA = {
     'Metro': {
         'nombre': 'Entrega personal en estación de Metro',
         'costo': 0,
-        'tarifa': '$200 por kilómetro desde Universidad de Chile',
+        'tarifa': '$200 por kilómetro · Universidad de Chile: $200',
         'plazo': '1 a 2 días hábiles tras la confirmación del pago.',
         'seguimiento': 'La vendedora coordina la estación y hora por WhatsApp; el estado también se consulta con tu RUT y código de seguimiento en LogisFlow.',
     },
@@ -69,21 +70,28 @@ def datos_estacion_metro(codigo):
 
 
 def estaciones_metro_para_checkout():
-    """Datos serializables para que la interfaz muestre estación y tarifa exactas."""
+    # Datos serializables para que la interfaz muestre estación y tarifa exactas.
     return {codigo: datos.copy() for codigo, datos in ESTACIONES_METRO.items()}
 
 
 def informacion_entrega(tipo_entrega, estacion_metro=None):
-    """Devuelve una copia para que los datos del pedido queden inmutables."""
+    # Devuelve una copia para que los datos del pedido queden inmutables
     entrega = OPCIONES_ENTREGA[tipo_entrega].copy()
     if tipo_entrega == 'Metro':
         estacion = datos_estacion_metro(estacion_metro)
         entrega['nombre'] = f"Entrega personal en {estacion['nombre']} ({estacion['linea']})"
         entrega['costo'] = estacion['costo']
-        entrega['plazo'] = (
-            f"1 a 2 días hábiles tras la confirmación del pago · "
-            f"{estacion['kilometros']} km desde Universidad de Chile."
+        entrega['tarifa'] = (
+            'Universidad de Chile: $200 (primer tramo cobrable).'
+            if estacion['es_tramo_inicial']
+            else f"${estacion['costo']} ({estacion['kilometros']} km × $200 desde Universidad de Chile)."
         )
+        detalle_tramo = (
+            'Universidad de Chile: primer tramo cobrable.'
+            if estacion['es_tramo_inicial']
+            else f"{estacion['kilometros']} km cobrados desde Universidad de Chile."
+        )
+        entrega['plazo'] = f"1 a 2 días hábiles tras la confirmación del pago · {detalle_tramo}"
         entrega['seguimiento'] = (
             f"La vendedora coordina estación y hora en {estacion['nombre']} por WhatsApp; "
             'el estado también se consulta con tu RUT y código de seguimiento en LogisFlow.'

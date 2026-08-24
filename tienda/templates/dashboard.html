@@ -87,7 +87,7 @@
             {% endfor %}
         {% endif %}
 
-        <!-- SECCIÓN 1: SUPER KPIs -->
+        <!-- SUPER KPIs -->
         <div class="row g-3 mb-4">
             <div class="col-md-4 col-lg-2">
                 <div class="card kpi-card shadow-sm h-100" style="border-color: #198754;">
@@ -165,12 +165,16 @@
                     data-bs-target="#cotizador" type="button" role="tab"><i
                         class="bi bi-calculator me-2"></i>Calculadora de Precios</button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="privacidad-tab" data-bs-toggle="tab" data-bs-target="#privacidad"
+                    type="button" role="tab"><i class="bi bi-shield-check me-2"></i>Privacidad</button>
+            </li>
         </ul>
 
         <!-- Contenido de las Pestañas -->
         <div class="tab-content bg-white p-4 rounded-bottom shadow-sm border border-top-0" id="adminTabsContent">
 
-            <!-- PESTAÑA 1: PEDIDOS REALES -->
+            <!-- Pedidos reales -->
             <div class="tab-pane fade show active" id="pedidos" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h4 class="mb-0">Flujo de Despachos</h4>
@@ -245,7 +249,7 @@
                 </div>
             </div>
 
-            <!-- PESTAÑA 2: INTENTOS DE PAGO NO CONFIRMADOS -->
+            <!-- Intentos de pago no confirmados -->
             <div class="tab-pane fade" id="abandonos" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h4 class="mb-0 text-warning"><i class="bi bi-credit-card me-2"></i>Intentos de pago no confirmados</h4>
@@ -283,7 +287,7 @@
                 </div>
             </div>
 
-            <!-- PESTAÑA 3: INVENTARIO CON FOTOS Y TALLAS -->
+            <!-- Inventario con fotos y tallas-->
             <div class="tab-pane fade" id="inventario" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h4 class="mb-0">Catálogo de Productos y Tallas</h4>
@@ -360,7 +364,7 @@
                 </div>
             </div>
 
-            <!-- PESTAÑA 4: CALCULADORA DE PRECIOS -->
+            <!-- Calculadora de precios -->
             <div class="tab-pane fade" id="cotizador" role="tabpanel">
                 <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-4"><div><p class="eyebrow mb-1">HERRAMIENTA DE PRECIOS</p><h4 class="mb-1">Calcula un precio rentable</h4><p class="text-secondary small mb-0">Incluye costos reales, comisión de pago y un margen objetivo.</p></div><span class="badge rounded-pill border bg-light text-dark px-3 py-2"><i class="bi bi-info-circle me-1 text-primary"></i>Valores referenciales</span></div>
                 <div class="row g-4">
@@ -381,10 +385,15 @@
                     <div class="col-lg-5"><section class="calc-result shadow-sm h-100"><div class="p-4 p-lg-5"><div class="d-flex justify-content-between align-items-start gap-3 mb-4"><div><p class="eyebrow text-white-50 mb-1">RESULTADO</p><h5 class="fw-bold mb-0">Precio recomendado</h5></div><i class="bi bi-stars fs-3" style="color:#f7bed5;"></i></div><div class="price-highlight text-center p-3 mb-4"><span class="d-block small text-white-50">PRECIO DE LISTA REDONDEADO</span><strong class="price-value" id="res_precioventa">—</strong><small class="d-block text-white-50 mt-1" id="resumen_precio">Ingresa el costo de la prenda para calcular.</small></div><div class="calc-row"><span class="calc-label">Costos directos</span><strong id="res_costototal">$0</strong></div><div class="calc-row"><span class="calc-label">Comisión estimada</span><strong id="res_comision">$0</strong></div><div class="calc-row"><span class="calc-label">Ganancia neta estimada</span><strong id="res_ganancia">$0</strong></div><div class="calc-row"><span class="calc-label">Margen real sobre costo</span><strong id="res_margen_real">0%</strong></div><div class="calc-mini mt-4 p-3 text-dark"><span class="d-block text-secondary small fw-bold">PRECIO MÍNIMO PARA NO PERDER</span><strong class="fs-5" id="res_precio_minimo">$0</strong><span class="d-block calc-note mt-1">Cubre costos y comisión, sin ganancia.</span></div></div></section></div>
                 </div>
             </div>
+
+            <div class="tab-pane fade" id="privacidad" role="tabpanel">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4"><div><p class="eyebrow mb-1">DATOS PERSONALES</p><h4 class="mb-1">Solicitudes de clientes</h4><p class="small text-secondary mb-0">Revisa solicitudes de acceso, corrección, oposición, portabilidad o supresión.</p></div><a href="{% url 'politica_privacidad' %}" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill">Ver política pública</a></div>
+                <div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light"><tr><th>Fecha</th><th>Cliente</th><th>Solicitud</th><th>Detalle</th><th>Acción</th></tr></thead><tbody>{% for solicitud in solicitudes_privacidad %}<tr><td>{{ solicitud.creado_en|date:"d/m/Y H:i" }}</td><td>{% if solicitud.cliente %}<strong>{{ solicitud.cliente.nombre }}</strong><br><small class="text-muted">{{ solicitud.cliente.rut }}</small>{% else %}<span class="text-muted">Cliente anonimizado</span>{% endif %}</td><td>{{ solicitud.get_tipo_display }}</td><td class="small text-secondary">{{ solicitud.detalle|default:"Sin detalle adicional" }}</td><td><form method="post" action="{% url 'resolver_solicitud_privacidad' solicitud.id %}" class="d-flex flex-wrap gap-2">{% csrf_token %}{% if solicitud.tipo == 'SUPRESION' %}<button name="accion" value="anonimizar" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Anonimizar los datos personales de este cliente? Esta acción no se puede deshacer.');">Anonimizar y resolver</button>{% else %}<button name="accion" value="resolver" class="btn btn-sm btn-primary">Marcar resuelta</button>{% endif %}</form></td></tr>{% empty %}<tr><td colspan="5" class="text-center text-muted py-4">No hay solicitudes pendientes.</td></tr>{% endfor %}</tbody></table></div>
+            </div>
         </div>
     </div>
 
-    <!-- MODAL 1: CREAR/EDITAR PRODUCTO -->
+    <!-- Crear/Editar producto -->
     <div class="modal fade" id="modalProducto" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content border-0 shadow">
@@ -486,7 +495,7 @@
         </div>
     </div>
 
-    <!-- MODAL 2: GESTIONAR TALLAS (MODAL VERDE) -->
+    <!-- Gestionar tallas  -->
     <div class="modal fade" id="modalTalla" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-sm">
             <div class="modal-content border-0 shadow">

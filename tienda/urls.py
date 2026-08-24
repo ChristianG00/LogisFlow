@@ -8,6 +8,13 @@ urlpatterns = [
     path('', views.catalogo, name='catalogo'),
     path('producto/<int:producto_id>/', views.producto_detalle, name='producto_detalle'),
     path('recomendador/', motor_recomendacion, name='recomendador'),
+    path('cuenta/registro/', views.registro_cliente, name='registro_cliente'),
+    path('cuenta/ingresar/', views.iniciar_sesion_cliente, name='iniciar_sesion_cliente'),
+    path('cuenta/salir/', views.cerrar_sesion_cliente, name='cerrar_sesion_cliente'),
+    path('mi-cuenta/', views.mi_cuenta, name='mi_cuenta'),
+    path('mi-cuenta/direccion/', views.actualizar_direccion_cliente, name='actualizar_direccion_cliente'),
+    path('mi-cuenta/mis-datos/', views.descargar_mis_datos, name='descargar_mis_datos'),
+    path('mi-cuenta/privacidad/', views.solicitar_privacidad, name='solicitar_privacidad'),
     
     
     # Rutas del Carrito
@@ -22,11 +29,14 @@ urlpatterns = [
     path('exito/<uuid:referencia>/', views.pedido_exitoso, name='pedido_exitoso'),
     path('seguimiento/', views.seguimiento, name='seguimiento'),
     path('despacho-y-boleta/', views.politicas_despacho, name='politicas_despacho'),
+    path('terminos-y-condiciones/', views.terminos_condiciones, name='terminos_condiciones'),
+    path('politica-de-privacidad/', views.politica_privacidad, name='politica_privacidad'),
     path('webhook/', views.webhook_mercadopago, name='webhook_mercadopago'),
     
     # Rutas administrativas (Aquí están todas las de la dueña)
     path('dashboard/', views.dashboard, name='dashboard'),
     path('dashboard/pedido/actualizar/', views.actualizar_estado_pedido, name='actualizar_estado_pedido'),
+    path('dashboard/privacidad/<int:solicitud_id>/resolver/', views.resolver_solicitud_privacidad, name='resolver_solicitud_privacidad'),
     path('dashboard/producto/guardar/', views.guardar_producto, name='guardar_producto'),
     path('dashboard/producto/eliminar/<int:producto_id>/', views.eliminar_producto, name='eliminar_producto'),
     path('dashboard/producto/talla/guardar/', views.guardar_talla, name='guardar_talla'),

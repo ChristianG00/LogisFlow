@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuenta cliente · LogisFlow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root { --ink: #34233d; --brand: #b4487a; --brand-dark: #93365f; }
+        body { min-height: 100vh; color: var(--ink); background: radial-gradient(circle at 5% 8%, #fbe2ee 0, transparent 30rem), radial-gradient(circle at 95% 88%, #e8d8f2 0, transparent 28rem), #fcf7fa; }
+        .auth-shell { max-width: 1080px; }
+        .auth-card { overflow: hidden; border: 0; border-radius: 26px; box-shadow: 0 20px 54px rgba(75,36,64,.14); background: #fff; }
+        .auth-side { position: relative; overflow: hidden; min-height: 100%; color: #fff; background: linear-gradient(145deg, #34233d, #7c3f69 63%, #b4487a); }
+        .auth-side::after { content: ''; position: absolute; width: 210px; height: 210px; right: -85px; bottom: -90px; border: 35px solid rgba(255,255,255,.09); border-radius: 50%; }
+        .auth-side-content { position: relative; z-index: 1; }
+        .auth-badge { display: inline-flex; align-items: center; gap: .45rem; padding: .45rem .7rem; border: 1px solid rgba(255,255,255,.25); border-radius: 999px; background: rgba(255,255,255,.1); font-size: .74rem; font-weight: 800; letter-spacing: .06em; }
+        .auth-forms { height: 520px; overflow: hidden; background: #fff; transition: height .45s cubic-bezier(.2,.8,.2,1); }
+        .auth-track { display: flex; align-items: flex-start; width: 200%; transition: transform .45s cubic-bezier(.2,.8,.2,1); }
+        .auth-card.is-register .auth-track { transform: translateX(-50%); }
+        .auth-card.is-register .auth-forms { height: 900px; }
+        .auth-panel { width: 50%; flex: 0 0 50%; padding: 2.4rem 2.5rem; }
+        .brand { color: var(--brand); }
+        .form-control { min-height: 47px; border-radius: 11px; border-color: #dcdde6; }
+        .form-control:focus { border-color: #d67da7; box-shadow: 0 0 0 .2rem rgba(180,72,122,.13); }
+        .btn-primary { --bs-btn-bg: #b4487a; --bs-btn-border-color: #b4487a; --bs-btn-hover-bg: #93365f; --bs-btn-hover-border-color: #93365f; --bs-btn-active-bg: #7a294e; --bs-btn-active-border-color: #7a294e; }
+        .switch-button { border: 0; padding: 0; color: var(--brand); background: transparent; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+        .switch-button:hover { color: var(--brand-dark); }
+        .verification-box { border: 1px solid #ead4df; border-radius: 14px; background: #fff8fb; padding: 1rem; }
+        .verification-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
+        .verification-option { display: flex; align-items: center; gap: .45rem; min-height: 48px; padding: .55rem; border: 1px solid #e4d8df; border-radius: 10px; background: #fff; cursor: pointer; font-size: .83rem; }
+        .verification-option:hover { border-color: #b4487a; background: #fff4f8; }
+        .verification-option .form-check-input { flex: 0 0 auto; margin: 0; }
+        .privacy-check { border: 1px solid #e6e3e8; border-radius: 12px; background: #faf9fb; }
+        .auth-footer { margin-top: auto; color: #bdb3be; background: var(--ink); }
+        .auth-footer a { color: #f0c6d9; text-decoration: none; }
+        .auth-footer a:hover { color: #fff; }
+        @media (max-width: 767px) {
+            body { display: block !important; }
+            .auth-card { border-radius: 20px; }
+            .auth-side { min-height: auto; }
+            .auth-forms, .auth-card.is-register .auth-forms { height: auto !important; }
+            .auth-panel { padding: 1.75rem 1.35rem; }
+            .verification-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+    </style>
+</head>
+<body class="d-flex flex-column">
+    <main class="container auth-shell flex-grow-1 d-flex align-items-center py-4 py-lg-5">
+        <section id="auth-card" class="auth-card {% if modo_auth == 'registro' %}is-register{% endif %}">
+            <div class="row g-0 align-items-stretch">
+                <aside class="col-md-5 auth-side p-4 p-lg-5 d-flex flex-column justify-content-between">
+                    <div class="auth-side-content">
+                        <a href="{% url 'catalogo' %}" class="text-white text-decoration-none fw-bold"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a>
+                        <p class="mt-5 mb-3"><span class="auth-badge"><i class="bi bi-person-heart"></i>CUENTA CLIENTE</span></p>
+                        <h1 class="h2 fw-bold mb-3">Una cuenta, un solo acceso.</h1>
+                        <p class="text-white-50 mb-0">Ingresa si ya tienes cuenta o crea una desde este mismo panel. Recuerda que comprar como invitada sigue siendo una opción.</p>
+                    </div>
+                    <p class="auth-side-content small text-white-50 mb-0"><i class="bi bi-shield-check me-1"></i>Solicitamos solo los datos necesarios para tu cuenta y compras.</p>
+                </aside>
+
+                <section class="col-md-7 auth-forms" aria-live="polite">
+                    <div class="auth-track">
+                        <div class="auth-panel" id="panel-ingreso">
+                            <p class="small fw-bold brand mb-2">INICIAR SESIÓN</p>
+                            <h2 class="h3 fw-bold mb-2">Qué bueno verte de nuevo</h2>
+                            <p class="text-secondary small mb-4">Ingresa con el correo o celular asociado a tu cuenta y tu contraseña.</p>
+                            <form method="post" action="{% url 'iniciar_sesion_cliente' %}" novalidate>
+                                {% csrf_token %}
+                                {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+                                {% if formulario_ingreso.non_field_errors %}<div class="alert alert-danger rounded-3 small">{{ formulario_ingreso.non_field_errors }}</div>{% endif %}
+                                <div class="mb-3"><label class="form-label fw-semibold" for="{{ formulario_ingreso.identificador.id_for_label }}">Correo o celular</label>{{ formulario_ingreso.identificador }}{% if formulario_ingreso.identificador.errors %}<div class="text-danger small mt-1">{{ formulario_ingreso.identificador.errors|striptags }}</div>{% endif %}</div>
+                                <div class="mb-4"><label class="form-label fw-semibold" for="{{ formulario_ingreso.password.id_for_label }}">Contraseña</label>{{ formulario_ingreso.password }}{% if formulario_ingreso.password.errors %}<div class="text-danger small mt-1">{{ formulario_ingreso.password.errors|striptags }}</div>{% endif %}</div>
+                                <button type="submit" class="btn btn-primary w-100 fw-bold py-3">Ingresar a mi cuenta <i class="bi bi-arrow-right ms-1"></i></button>
+                            </form>
+                            <p class="text-center small text-secondary mt-4 mb-0">¿Aún no tienes cuenta? <button class="switch-button" type="button" data-auth-target="registro">Crear cuenta</button>.</p>
+                        </div>
+
+                        <div class="auth-panel" id="panel-registro">
+                            <p class="small fw-bold brand mb-2">REGISTRO CLIENTE</p>
+                            <h2 class="h3 fw-bold mb-2">Crea tu cuenta</h2>
+                            <p class="text-secondary small mb-4">No necesitas haber comprado antes. Tus datos quedan asociados a una sola cuenta para protegerlos.</p>
+                            <form method="post" action="{% url 'registro_cliente' %}" novalidate>
+                                {% csrf_token %}
+                                {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+                                {% if formulario_registro.non_field_errors %}<div class="alert alert-danger rounded-3 small">{{ formulario_registro.non_field_errors }}</div>{% endif %}
+                                <div class="row g-3">
+                                    <div class="col-md-6"><label class="form-label fw-semibold" for="{{ formulario_registro.rut.id_for_label }}">RUT</label>{{ formulario_registro.rut }}{% if formulario_registro.rut.errors %}<div class="text-danger small mt-1">{{ formulario_registro.rut.errors|striptags }}</div>{% endif %}</div>
+                                    <div class="col-md-6"><label class="form-label fw-semibold" for="{{ formulario_registro.telefono.id_for_label }}">Teléfono</label>{{ formulario_registro.telefono }}{% if formulario_registro.telefono.errors %}<div class="text-danger small mt-1">{{ formulario_registro.telefono.errors|striptags }}</div>{% endif %}</div>
+                                    <div class="col-12"><label class="form-label fw-semibold" for="{{ formulario_registro.nombre.id_for_label }}">Nombre completo</label>{{ formulario_registro.nombre }}{% if formulario_registro.nombre.errors %}<div class="text-danger small mt-1">{{ formulario_registro.nombre.errors|striptags }}</div>{% endif %}</div>
+                                    <div class="col-12"><label class="form-label fw-semibold" for="{{ formulario_registro.email.id_for_label }}">Correo electrónico</label>{{ formulario_registro.email }}<small class="text-secondary d-block mt-1">Lo usaremos para tu compra y cuenta; no para publicidad.</small>{% if formulario_registro.email.errors %}<div class="text-danger small mt-1">{{ formulario_registro.email.errors|striptags }}</div>{% endif %}</div>
+                                    <div class="col-md-6"><label class="form-label fw-semibold" for="{{ formulario_registro.password1.id_for_label }}">Contraseña</label>{{ formulario_registro.password1 }}{% if formulario_registro.password1.errors %}<div class="text-danger small mt-1">{{ formulario_registro.password1.errors|striptags }}</div>{% endif %}</div>
+                                    <div class="col-md-6"><label class="form-label fw-semibold" for="{{ formulario_registro.password2.id_for_label }}">Repite la contraseña</label>{{ formulario_registro.password2 }}{% if formulario_registro.password2.errors %}<div class="text-danger small mt-1">{{ formulario_registro.password2.errors|striptags }}</div>{% endif %}</div>
+                                    <div class="col-12"><div class="verification-box"><label class="form-label fw-semibold"><i class="bi bi-shield-check me-1"></i>Verificación humana</label><p class="small text-secondary mb-3">{{ desafio_registro.instruccion }}.</p><div class="verification-grid">{% for opcion in formulario_registro.verificacion_humana %}<label class="verification-option">{{ opcion.tag }}<span>{{ opcion.choice_label }}</span></label>{% endfor %}</div>{% if formulario_registro.verificacion_humana.errors %}<div class="text-danger small mt-2">{{ formulario_registro.verificacion_humana.errors|striptags }}</div>{% endif %}</div></div>
+                                </div>
+                                <div class="privacy-check form-check p-3 mt-4">{{ formulario_registro.aceptar_privacidad }}<label class="form-check-label small ms-2" for="{{ formulario_registro.aceptar_privacidad.id_for_label }}">Leí la <a href="{% url 'politica_privacidad' %}" target="_blank" rel="noopener">Política de privacidad</a> y autorizo el uso de mis datos para administrar mi cuenta y compras.</label>{% if formulario_registro.aceptar_privacidad.errors %}<div class="text-danger small mt-1">{{ formulario_registro.aceptar_privacidad.errors|striptags }}</div>{% endif %}</div>
+                                <button class="btn btn-primary w-100 fw-bold py-3 mt-4" type="submit">Crear mi cuenta <i class="bi bi-arrow-right ms-1"></i></button>
+                            </form>
+                            <p class="text-center small text-secondary mt-4 mb-0">¿Ya tienes cuenta? <button class="switch-button" type="button" data-auth-target="ingreso">Iniciar sesión</button>.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </section>
+    </main>
+    <footer class="auth-footer py-4"><div class="container auth-shell d-flex flex-wrap justify-content-between align-items-center gap-2"><span class="small"><strong class="text-white">LOGISFLOW</strong> · Moda femenina, compra y despacho con información clara.</span><div class="d-flex flex-wrap gap-3 small"><a href="{% url 'politicas_despacho' %}">Despacho</a><a href="{% url 'terminos_condiciones' %}">Términos y privacidad</a><a href="{% url 'seguimiento' %}">Seguimiento</a><a href="{% url 'login' %}"><i class="bi bi-shield-lock me-1"></i>Administración</a></div></div></footer>
+    <script>
+        (() => {
+            const card = document.getElementById('auth-card');
+            const forms = card.querySelector('.auth-forms');
+            const ajustarAltura = () => {
+                if (window.matchMedia('(max-width: 767px)').matches) return;
+                const panelActivo = card.querySelector(card.classList.contains('is-register') ? '#panel-registro' : '#panel-ingreso');
+                forms.style.height = `${Math.ceil(panelActivo.getBoundingClientRect().height)}px`;
+            };
+            window.requestAnimationFrame(ajustarAltura);
+            window.addEventListener('resize', ajustarAltura);
+            document.querySelectorAll('[data-auth-target]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const isRegister = button.dataset.authTarget === 'registro';
+                    card.classList.toggle('is-register', isRegister);
+                    ajustarAltura();
+                    const input = document.querySelector(isRegister ? '#panel-registro input' : '#panel-ingreso input');
+                    if (input) window.setTimeout(() => input.focus(), 300);
+                });
+            });
+        })();
+    </script>
+</body>
+</html>

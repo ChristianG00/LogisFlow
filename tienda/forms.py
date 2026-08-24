@@ -1,9 +1,11 @@
 import re
 from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
 from .logistica import ESTACIONES_METRO_CHOICES, datos_estacion_metro
-from .models import Producto, VarianteProducto
+from .models import Cliente, Producto, SolicitudPrivacidad, VarianteProducto
 
 
 def normalizar_rut(rut):
@@ -27,17 +29,42 @@ def normalizar_rut(rut):
     return f'{cuerpo}-{dv}'
 
 
+def normalizar_telefono(telefono):
+    telefono_limpio = re.sub(r'[\s()-]', '', str(telefono).strip())
+    coincidencia = re.fullmatch(r'(?:\+?56)?(9\d{8})', telefono_limpio)
+    if not coincidencia:
+        raise ValidationError('Ingresa un celular chileno válido de 9 dígitos (Ej: 912345678).')
+    return f"+56 {coincidencia.group(1)}"
+
+
+def normalizar_email(email):
+    return str(email).strip().lower()
+
+
 class CheckoutForm(forms.Form):
     rut = forms.CharField(
-        max_length=12, 
+        max_length=12,
+        error_messages={'required': 'Ingresa tu RUT para identificar la compra.'},
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: 12.345.678-9'})
     )
     nombre = forms.CharField(
-        max_length=100, 
+        max_length=100,
+        error_messages={'required': 'Ingresa tu nombre completo.'},
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre y Apellido'})
     )
+    email = forms.EmailField(
+        max_length=254,
+        error_messages={
+            'required': 'Ingresa un correo para enviarte información de tu compra.',
+            'invalid': 'Ingresa un correo electrónico válido, por ejemplo nombre@correo.cl.',
+        },
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control', 'placeholder': 'nombre@correo.cl', 'autocomplete': 'email',
+        }),
+    )
     telefono = forms.CharField(
-        max_length=15, 
+        max_length=15,
+        error_messages={'required': 'Ingresa un celular para coordinar la entrega.'},
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: 912345678'})
     )
     
@@ -49,7 +76,8 @@ class CheckoutForm(forms.Form):
         ('Delivery', 'Despacho a domicilio por empresa de transporte'),
     ]
     tipo_entrega = forms.ChoiceField(
-        choices=ENTREGA_CHOICES, 
+        choices=ENTREGA_CHOICES,
+        error_messages={'required': 'Selecciona una modalidad de entrega.'},
         widget=forms.Select(attrs={'class': 'form-select', 'id': 'selector_entrega'})
     )
 
@@ -67,7 +95,8 @@ class CheckoutForm(forms.Form):
 
     aceptar_terminos = forms.BooleanField(
         required=True,
-        label="Acepto que mis datos se usen solo para gestionar la compra, el despacho y el seguimiento.",
+        label="Acepto los Términos y condiciones de compra.",
+        error_messages={'required': 'Debes aceptar los términos, despacho y política de privacidad para continuar.'},
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
 
@@ -82,14 +111,10 @@ class CheckoutForm(forms.Form):
             raise ValidationError(str(error))
 
     def clean_telefono(self):
-        telefono = self.cleaned_data.get('telefono', '').strip()
-        # Permite escribir 912345678, 56912345678 o +56 9 1234 5678.
-        tel_limpio = re.sub(r'[\s()-]', '', telefono)
-        coincidencia = re.fullmatch(r'(?:\+?56)?(9\d{8})', tel_limpio)
-        if not coincidencia:
-            raise ValidationError("Ingresa un celular chileno válido de 9 dígitos (Ej: 912345678).")
-            
-        return f"+56 {coincidencia.group(1)}"
+        return normalizar_telefono(self.cleaned_data.get('telefono', ''))
+
+    def clean_email(self):
+        return normalizar_email(self.cleaned_data.get('email', ''))
 
     def clean_nombre(self):
         nombre = ' '.join(self.cleaned_data['nombre'].split())
@@ -102,6 +127,20 @@ class CheckoutForm(forms.Form):
         tipo_entrega = cleaned_data.get('tipo_entrega')
         direccion = ' '.join((cleaned_data.get('direccion') or '').split())
         estacion_metro = cleaned_data.get('estacion_metro')
+        rut = cleaned_data.get('rut')
+        telefono = cleaned_data.get('telefono')
+        email = cleaned_data.get('email')
+
+        if rut and telefono and Cliente.objects.filter(
+            telefono=telefono,
+            anonimizado_en__isnull=True,
+        ).exclude(rut=rut).exists():
+            self.add_error('telefono', 'Este teléfono ya está asociado a otro RUT. Usa un número personal distinto.')
+        if rut and email and Cliente.objects.filter(
+            email__iexact=email,
+            anonimizado_en__isnull=True,
+        ).exclude(rut=rut).exists():
+            self.add_error('email', 'Este correo ya está asociado a otro RUT. Usa un correo personal distinto.')
 
         # La dirección se determina en el servidor, nunca solo en JavaScript.
         if tipo_entrega == 'Retiro':
@@ -154,3 +193,184 @@ class TallaForm(forms.Form):
     producto_id = forms.IntegerField(min_value=1)
     talla = forms.ChoiceField(choices=VarianteProducto.TALLAS_CHOICES)
     stock = forms.IntegerField(min_value=0, max_value=100000)
+
+
+class RegistroClienteForm(forms.Form):
+    rut = forms.CharField(
+        max_length=12,
+        error_messages={'required': 'Ingresa tu RUT para crear la cuenta.'},
+        widget=forms.TextInput(attrs={
+            'class': 'form-control', 'placeholder': 'Ej: 12.345.678-9', 'autocomplete': 'username',
+        }),
+    )
+    nombre = forms.CharField(
+        max_length=100,
+        error_messages={'required': 'Ingresa tu nombre completo.'},
+        widget=forms.TextInput(attrs={
+            'class': 'form-control', 'placeholder': 'Nombre y apellido', 'autocomplete': 'name',
+        }),
+    )
+    email = forms.EmailField(
+        max_length=254,
+        error_messages={
+            'required': 'Ingresa tu correo electrónico.',
+            'invalid': 'Ingresa un correo electrónico válido, por ejemplo nombre@correo.cl.',
+        },
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control', 'placeholder': 'nombre@correo.cl', 'autocomplete': 'email',
+        }),
+    )
+    telefono = forms.CharField(
+        max_length=20,
+        error_messages={'required': 'Ingresa un celular chileno para crear la cuenta.'},
+        widget=forms.TextInput(attrs={
+            'class': 'form-control', 'placeholder': 'Ej: 912345678', 'autocomplete': 'tel',
+        }),
+    )
+    verificacion_humana = forms.MultipleChoiceField(
+        choices=(),
+        required=True,
+        error_messages={
+            'required': 'Selecciona las opciones indicadas para verificar que eres una persona.',
+            'invalid_choice': 'Una opción de verificación no es válida. Recarga la página e inténtalo otra vez.',
+        },
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+    )
+    password1 = forms.CharField(
+        error_messages={'required': 'Crea una contraseña para proteger tu cuenta.'},
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control', 'autocomplete': 'new-password', 'placeholder': 'Mínimo 10 caracteres',
+        }),
+    )
+    password2 = forms.CharField(
+        error_messages={'required': 'Repite tu contraseña para confirmarla.'},
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control', 'autocomplete': 'new-password', 'placeholder': 'Repite tu contraseña',
+        }),
+    )
+    aceptar_privacidad = forms.BooleanField(
+        required=True,
+        error_messages={'required': 'Debes aceptar la política de privacidad para crear tu cuenta.'},
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        opciones_verificacion = kwargs.pop('opciones_verificacion', ())
+        super().__init__(*args, **kwargs)
+        self.fields['verificacion_humana'].choices = opciones_verificacion
+        self.cliente_existente = None
+
+    def clean_rut(self):
+        try:
+            return normalizar_rut(self.cleaned_data.get('rut', ''))
+        except ValueError as error:
+            raise ValidationError(str(error))
+
+    def clean_nombre(self):
+        nombre = ' '.join(self.cleaned_data['nombre'].split())
+        if len(nombre) < 3:
+            raise ValidationError('Ingresa tu nombre completo.')
+        return nombre
+
+    def clean_telefono(self):
+        return normalizar_telefono(self.cleaned_data.get('telefono', ''))
+
+    def clean_email(self):
+        return normalizar_email(self.cleaned_data.get('email', ''))
+
+    def clean(self):
+        cleaned = super().clean()
+        password1, password2 = cleaned.get('password1'), cleaned.get('password2')
+        if password1 and password2:
+            if password1 != password2:
+                self.add_error('password2', 'Las contraseñas no coinciden.')
+            elif len(password1) < 10:
+                self.add_error('password1', 'La contraseña debe tener al menos 10 caracteres.')
+            else:
+                try:
+                    validate_password(password1)
+                except ValidationError as error:
+                    self.add_error('password1', error)
+
+        rut, telefono, email = cleaned.get('rut'), cleaned.get('telefono'), cleaned.get('email')
+        if rut and telefono:
+            self.cliente_existente = Cliente.objects.filter(
+                rut=rut,
+                anonimizado_en__isnull=True,
+            ).select_related('usuario').first()
+            telefono_ya_usado = Cliente.objects.filter(
+                telefono=telefono,
+                anonimizado_en__isnull=True,
+            ).exclude(rut=rut).exists()
+            correo_ya_usado = email and Cliente.objects.filter(
+                email__iexact=email,
+                anonimizado_en__isnull=True,
+            ).exclude(rut=rut).exists()
+            usuario_ya_usado = email and get_user_model().objects.filter(
+                email__iexact=email,
+            ).exclude(pk=self.cliente_existente.usuario_id if self.cliente_existente else None).exists()
+            if self.cliente_existente and self.cliente_existente.usuario_id:
+                self.add_error('rut', 'Ya existe una cuenta para este RUT. Inicia sesión.')
+            elif self.cliente_existente and self.cliente_existente.telefono != telefono:
+                self.add_error('telefono', 'El teléfono no coincide con una compra anterior. Solicita una rectificación por el canal de atención de la tienda.')
+            elif telefono_ya_usado:
+                self.add_error('telefono', 'Este teléfono ya está asociado a otra cuenta o registro de cliente.')
+            if correo_ya_usado or usuario_ya_usado:
+                self.add_error('email', 'Este correo ya está registrado. Ingresa otro correo o inicia sesión.')
+        return cleaned
+
+
+class AccesoClienteForm(forms.Form):
+    identificador = forms.CharField(max_length=254, widget=forms.TextInput(attrs={
+        'class': 'form-control', 'placeholder': 'nombre@correo.cl o 912345678', 'autocomplete': 'username',
+    }))
+    password = forms.CharField(widget=forms.PasswordInput(attrs={
+        'class': 'form-control', 'placeholder': 'Tu contraseña', 'autocomplete': 'current-password',
+    }))
+
+    def clean_identificador(self):
+        identificador = str(self.cleaned_data.get('identificador', '')).strip()
+        if '@' in identificador:
+            try:
+                forms.EmailField().clean(identificador)
+            except ValidationError:
+                raise ValidationError('Ingresa un correo electrónico válido o un celular chileno de 9 dígitos.')
+            return normalizar_email(identificador)
+        try:
+            return normalizar_telefono(identificador)
+        except ValidationError:
+            raise ValidationError('Ingresa un correo electrónico válido o un celular chileno de 9 dígitos.')
+
+
+class DireccionClienteForm(forms.ModelForm):
+    """La dirección es el único dato de cuenta que la clienta puede actualizar directamente."""
+
+    class Meta:
+        model = Cliente
+        fields = ['direccion']
+        widgets = {
+            'direccion': forms.TextInput(attrs={
+                'class': 'form-control',
+                'autocomplete': 'street-address',
+                'placeholder': 'Calle, número, comuna y referencia',
+            }),
+        }
+
+    def clean_direccion(self):
+        direccion = ' '.join(self.cleaned_data.get('direccion', '').split())
+        if len(direccion) < 4:
+            raise ValidationError('Ingresa una dirección más específica.')
+        return direccion
+
+
+class SolicitudPrivacidadForm(forms.ModelForm):
+    class Meta:
+        model = SolicitudPrivacidad
+        fields = ['tipo', 'detalle']
+        widgets = {
+            'tipo': forms.Select(attrs={'class': 'form-select'}),
+            'detalle': forms.Textarea(attrs={
+                'class': 'form-control', 'rows': 4,
+                'placeholder': 'Indica qué datos, pedido o tratamiento quieres consultar.',
+            }),
+        }

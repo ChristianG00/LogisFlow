@@ -50,9 +50,18 @@
 </head>
 <body>
     <nav class="cart-nav py-3">
-        <div class="container cart-shell d-flex align-items-center justify-content-between">
+        <div class="container cart-shell d-flex flex-wrap align-items-center justify-content-between gap-2">
             <a class="text-decoration-none fw-bold fs-5 text-primary" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a>
-            <a href="{% url 'catalogo' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-arrow-left me-1"></i> Seguir viendo</a>
+            <div class="d-flex flex-wrap align-items-center justify-content-end gap-2">
+                {% if user.is_authenticated and not user.is_staff %}
+                    <a href="{% url 'mi_cuenta' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-person-heart me-1"></i>Mi cuenta</a>
+                {% elif user.is_staff %}
+                    <a href="{% url 'dashboard' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-shield-lock me-1"></i>Panel</a>
+                {% else %}
+                    <a href="{% url 'iniciar_sesion_cliente' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-person me-1"></i>Iniciar sesión</a>
+                {% endif %}
+                <a href="{% url 'catalogo' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-arrow-left me-1"></i> Seguir viendo</a>
+            </div>
         </div>
     </nav>
 
@@ -63,7 +72,7 @@
         </div>
 
         {% if messages %}{% for message in messages %}<div class="alert alert-info border-0 shadow-sm rounded-4 mb-3"><i class="bi bi-info-circle me-2"></i>{{ message }}</div>{% endfor %}{% endif %}
-        {% if carrito_expirado %}<div class="alert alert-warning border-0 shadow-sm rounded-4 mb-3"><i class="bi bi-clock-history me-2"></i>Tu carrito expiró tras 24 horas sin cambios. Agrega nuevamente los productos que quieras comprar.</div>{% endif %}
+        {% if carrito_expirado %}<div class="alert alert-warning border-0 shadow-sm rounded-4 mb-3"><i class="bi bi-clock-history me-2"></i>Tu carrito expiró tras {{ carrito_duracion_minutos }} minutos sin cambios. Agrega nuevamente los productos que quieras comprar.</div>{% endif %}
 
         <div class="row g-4 align-items-start">
             <div class="col-lg-8">
@@ -89,7 +98,7 @@
 
             <div class="col-lg-4">
                 <aside class="summary-card sticky-top" style="top: 20px;"><div class="p-4 p-lg-5"><p class="eyebrow text-white-50 mb-1">RESUMEN</p><h2 class="h4 fw-bold mb-4">Tu compra</h2>
-                    {% if carrito_expira_en_timestamp %}<div class="cart-expiry p-3 mb-4"><div class="d-flex gap-2"><i class="bi bi-bag-check-fill text-success mt-1"></i><small class="muted">Tu carrito se conserva <strong class="text-white">24 horas desde el último cambio</strong>. Puedes seguir mirando con tranquilidad.</small></div></div>{% endif %}
+                    {% if carrito_expira_en_timestamp %}<div class="cart-expiry p-3 mb-4"><div class="d-flex gap-2"><i class="bi bi-bag-check-fill text-success mt-1"></i><small class="muted">Tu carrito se conserva <strong class="text-white">{{ carrito_duracion_minutos }} minutos desde el último cambio</strong>. Puedes seguir mirando con tranquilidad.</small></div></div>{% endif %}
                     <div class="d-flex justify-content-between small muted mb-2"><span>Productos ({{ carrito|length }})</span><span>${{ total }}</span></div>
                     <div class="d-flex justify-content-between align-items-end border-top border-secondary pt-3 mt-3 mb-3"><span class="fs-5">Subtotal</span><strong class="fs-2 text-success">${{ total }}</strong></div>
                     <p class="small muted mb-4"><i class="bi bi-truck me-1"></i> El despacho, plazo y total final se informan antes de pagar.</p>

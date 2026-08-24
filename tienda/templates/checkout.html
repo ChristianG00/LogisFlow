@@ -78,6 +78,12 @@
                                 <div class="alert alert-danger rounded-3">{{ form.non_field_errors }}</div>
                             {% endif %}
 
+                            {% if user.is_authenticated and not user.is_staff %}
+                                <div class="secure-note p-3 mb-4"><div class="d-flex gap-3"><i class="bi bi-person-check fs-4"></i><div><strong>Estás comprando con tu cuenta</strong><br><small>Usaremos tus datos registrados; puedes modificarlos para esta compra si lo necesitas.</small></div></div></div>
+                            {% else %}
+                                <div class="secure-note p-3 mb-4"><div class="d-flex gap-3"><i class="bi bi-bag-check fs-4"></i><div><strong class="d-block">Puedes comprar como invitada</strong><small>No necesitas crear una cuenta para continuar. Si quieres registrarte, hazlo desde la portada o el carrito antes de finalizar la compra.</small></div></div></div>
+                            {% endif %}
+
                             <p class="section-title mb-3"><i class="bi bi-person-vcard me-2"></i>INFORMACIÓN DE CONTACTO</p>
                             <div class="row g-3">
                                 <div class="col-md-6">
@@ -95,7 +101,15 @@
                                         {% if form.nombre.errors %}<div class="error-message"><i class="bi bi-exclamation-circle me-1"></i>{{ form.nombre.errors|striptags }}</div>{% endif %}
                                     </div>
                                 </div>
-                                <div class="col-12">
+                                <div class="col-md-6">
+                                    <div class="field-block">
+                                        <label class="form-label fw-semibold">Correo electrónico</label>
+                                        {{ form.email }}
+                                        <small class="text-secondary d-block mt-1">Te enviaremos información de tu compra; no publicidad.</small>
+                                        {% if form.email.errors %}<div class="error-message"><i class="bi bi-exclamation-circle me-1"></i>{{ form.email.errors|striptags }}</div>{% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
                                     <div class="field-block">
                                         <label class="form-label fw-semibold">Teléfono celular</label>
                                         {{ form.telefono }}
@@ -137,7 +151,7 @@
 
                             <div class="form-check secure-note p-3 mb-4">
                                 {{ form.aceptar_terminos }}
-                                <label class="form-check-label ms-2 small" for="{{ form.aceptar_terminos.id_for_label }}">{{ form.aceptar_terminos.label }}</label>
+                                <label class="form-check-label ms-2 small" for="{{ form.aceptar_terminos.id_for_label }}">Acepto en conjunto los <a href="{% url 'terminos_condiciones' %}" target="_blank" rel="noopener">Términos y condiciones</a> y la <a href="{% url 'politica_privacidad' %}" target="_blank" rel="noopener">Política de privacidad</a>, además de la <a href="{% url 'politicas_despacho' %}" target="_blank" rel="noopener">política de despacho</a>.</label>
                                 {% if form.aceptar_terminos.errors %}<div class="error-message">{{ form.aceptar_terminos.errors|striptags }}</div>{% endif %}
                             </div>
 
@@ -160,7 +174,7 @@
                         {% if carrito_expira_en_timestamp %}
                             <div id="cart-timer" class="timer-box p-3 mb-4" data-expira-en="{{ carrito_expira_en_timestamp }}">
                                 <div class="d-flex justify-content-between align-items-center"><span class="small"><i class="bi bi-clock-history me-1"></i> Carrito activo</span><strong class="timer-value" data-timer-value>--:--</strong></div>
-                                <small class="d-block text-white-50 mt-1">Tienes {{ carrito_duracion_horas }} horas desde tu último cambio. El stock final se confirma al pagar.</small>
+                                <small class="d-block text-white-50 mt-1">Tienes {{ carrito_duracion_minutos }} minutos desde tu último cambio. El stock final se confirma al pagar.</small>
                             </div>
                         {% endif %}
 
@@ -226,7 +240,9 @@
                             ...entrega,
                             nombre: 'Entrega personal en ' + estacion.nombre + ' (' + estacion.linea + ')',
                             costo: estacion.costo,
-                            plazo: entrega.plazo + ' ' + estacion.kilometros + ' km desde Universidad de Chile.',
+                            plazo: entrega.plazo + ' ' + (estacion.es_tramo_inicial
+                                ? 'Universidad de Chile: primer tramo cobrable de $200.'
+                                : estacion.kilometros + ' km desde Universidad de Chile · $200 por kilómetro.'),
                             seguimiento: 'La vendedora coordinará la estación y hora por WhatsApp.',
                         };
                     } else {

@@ -2,11 +2,14 @@ import csv
 import json
 import logging
 import re
+import secrets
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 import mercadopago
 from django.conf import settings
+from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import transaction
@@ -14,24 +17,46 @@ from django.db.models import F
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from .forms import CheckoutForm, ProductoForm, TallaForm, normalizar_rut
+from .forms import (
+    AccesoClienteForm,
+    CheckoutForm,
+    DireccionClienteForm,
+    ProductoForm,
+    RegistroClienteForm,
+    SolicitudPrivacidadForm,
+    TallaForm,
+    normalizar_rut,
+)
 from .logistica import (
     OPCIONES_ENTREGA,
     ESTACIONES_METRO,
     estaciones_metro_para_checkout,
     informacion_entrega,
 )
-from .models import Cliente, DetallePedido, PagoPendiente, Pedido, Producto, VarianteProducto
+from .models import Cliente, DetallePedido, PagoPendiente, Pedido, Producto, SolicitudPrivacidad, VarianteProducto
+from .privacidad import anonimizar_datos_vencidos
 
 
 logger = logging.getLogger(__name__)
 MAX_CANTIDAD_POR_LINEA = 1000
-CARRITO_DURACION_HORAS = 24
-CARRITO_DURACION_MINUTOS = 60 * CARRITO_DURACION_HORAS
+CARRITO_DURACION_MINUTOS = 15
 RESERVA_DURACION_MINUTOS = 15
+
+# Las catagorias se mantienen para productos antiguos pero NO se muestran secciones duplicadas
+CATEGORIAS_CATALOGO = (
+    ('POLERAS', 'Poleras y tops', ('POLERAS', 'SUPERIOR')),
+    ('BLUSAS', 'Blusas', ('BLUSAS',)),
+    ('PANTALONES', 'Pantalones y jeans', ('PANTALONES', 'INFERIOR')),
+    ('FALDAS', 'Faldas', ('FALDAS',)),
+    ('VESTIDOS', 'Vestidos', ('VESTIDOS',)),
+    ('CHAQUETAS', 'Chaquetas y abrigos', ('CHAQUETAS',)),
+    ('CALZADO', 'Calzado', ('CALZADO',)),
+    ('ACCESORIO', 'Accesorios', ('ACCESORIO',)),
+)
 
 
 class CarritoInvalido(ValueError):
@@ -40,6 +65,101 @@ class CarritoInvalido(ValueError):
 
 class PagoNoConfirmado(ValueError):
     pass
+
+
+def _perfil_cliente(request):
+    if not request.user.is_authenticated:
+        return None
+    try:
+        return request.user.perfil_cliente
+    except Cliente.DoesNotExist:
+        return None
+
+
+def _destino_seguro(request, predeterminado):
+    destino = request.POST.get('next') or request.GET.get('next')
+    if destino and url_has_allowed_host_and_scheme(
+        destino,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return destino
+    return predeterminado
+
+
+def _nombre_usuario_cliente():
+    usuario_modelo = get_user_model()
+    while True:
+        nombre = f'cliente-{secrets.token_urlsafe(12)}'
+        if not usuario_modelo.objects.filter(username=nombre).exists():
+            return nombre
+
+
+def _nuevo_desafio_registro(request):
+    opciones = (
+        ('bus', '🚌 Autobús', 'transporte'),
+        ('bicicleta', '🚲 Bicicleta', 'transporte'),
+        ('auto', '🚗 Automóvil', 'transporte'),
+        ('blusa', '👚 Blusa', 'prenda'),
+        ('vestido', '👗 Vestido', 'prenda'),
+        ('zapato', '👠 Zapato', 'prenda'),
+        ('flor', '🌷 Flor', 'naturaleza'),
+        ('arbol', '🌳 Árbol', 'naturaleza'),
+        ('sol', '☀️ Sol', 'naturaleza'),
+    )
+    desafios = {
+        'transporte': 'Selecciona todos los medios de transporte',
+        'prenda': 'Selecciona todas las prendas de vestir',
+        'naturaleza': 'Selecciona todos los elementos de naturaleza',
+    }
+    categoria = secrets.choice(tuple(desafios))
+    correctas = [codigo for codigo, _, grupo in opciones if grupo == categoria]
+    distractores = [opcion for opcion in opciones if opcion[2] != categoria]
+    opciones_visibles = [opcion for opcion in opciones if opcion[2] == categoria]
+    opciones_visibles += secrets.SystemRandom().sample(distractores, 3)
+    secrets.SystemRandom().shuffle(opciones_visibles)
+    request.session['desafio_registro'] = {
+        'instruccion': desafios[categoria],
+        'opciones': [[codigo, etiqueta] for codigo, etiqueta, _ in opciones_visibles],
+        'correctas': correctas,
+    }
+    request.session.modified = True
+    return request.session['desafio_registro']
+
+
+def _desafio_registro_vigente(request, renovar=False):
+    # Obtiene el desafio de registro de la sesion sin cambiarlo al corregir un formulario
+    desafio = request.session.get('desafio_registro')
+    if (
+        renovar
+        or not isinstance(desafio, dict)
+        or not isinstance(desafio.get('opciones'), list)
+        or not isinstance(desafio.get('correctas'), list)
+    ):
+        return _nuevo_desafio_registro(request)
+    return desafio
+
+
+def _mostrar_acceso_cliente(
+    request,
+    *,
+    formulario_ingreso=None,
+    formulario_registro=None,
+    desafio=None,
+    modo='ingreso',
+):
+    # Muestra ingreso y registro en un unico panel de cuenta de cliente
+    desafio = desafio or _desafio_registro_vigente(request)
+    return render(request, 'cliente_login.html', {
+        'formulario_ingreso': formulario_ingreso or AccesoClienteForm(prefix='ingreso'),
+        'formulario_registro': formulario_registro or RegistroClienteForm(
+            opciones_verificacion=desafio['opciones'],
+            prefix='registro',
+        ),
+        'desafio_registro': desafio,
+        'modo_auth': modo,
+        'next': request.POST.get('next') or request.GET.get('next', ''),
+    })
 
 
 def _cantidad_valida(valor):
@@ -53,7 +173,7 @@ def _cantidad_valida(valor):
 
 
 def _normalizar_carrito(carrito):
-    """Reconstruye el carrito con datos actuales de la BD, nunca con precios del cliente."""
+    # Reconstruye el carrito con datos actuales de la BD, nunca con precios del cliente
     if not isinstance(carrito, dict) or not carrito:
         raise CarritoInvalido('El carrito está vacío o tiene un formato inválido.')
 
@@ -118,9 +238,10 @@ def _normalizar_carrito(carrito):
 
 
 def _obtener_carrito_vigente(request):
-    """La expiración se aplica en servidor incluso si el JavaScript no se ejecuta."""
+    # La expiracion se aplica en servidor incluso si el JavaScript no se ejecuta
     carrito = request.session.get('carrito', {})
     expiracion = request.session.get('carrito_expira_en')
+    duracion_guardada = request.session.get('carrito_duracion_minutos')
     if not isinstance(carrito, dict):
         carrito = {}
 
@@ -130,9 +251,15 @@ def _obtener_carrito_vigente(request):
         expiracion = None
 
     ahora = int(timezone.now().timestamp())
-    if carrito and expiracion is not None and expiracion <= ahora:
+
+    if carrito and (
+        duracion_guardada != CARRITO_DURACION_MINUTOS
+        or expiracion is None
+        or expiracion <= ahora
+    ):
         request.session.pop('carrito', None)
         request.session.pop('carrito_expira_en', None)
+        request.session.pop('carrito_duracion_minutos', None)
         request.session.modified = True
         return {}, True, None
     return carrito, False, expiracion
@@ -145,13 +272,15 @@ def _guardar_carrito(request, carrito, reiniciar_expiracion=False):
         if reiniciar_expiracion or not isinstance(expiracion, int):
             expiracion = timezone.now() + timedelta(minutes=CARRITO_DURACION_MINUTOS)
             request.session['carrito_expira_en'] = int(expiracion.timestamp())
+        request.session['carrito_duracion_minutos'] = CARRITO_DURACION_MINUTOS
     else:
         request.session.pop('carrito_expira_en', None)
+        request.session.pop('carrito_duracion_minutos', None)
     request.session.modified = True
 
 
 def _items_de_pago(pago):
-    """Devuelve las tallas y cantidades persistidas por el servidor en un intento de pago."""
+   # Devuelve las tallas y cantidades existidas por el servidor en un intento de pago
     try:
         items = pago.items
         if not isinstance(items, list) or not items:
@@ -173,7 +302,7 @@ def _items_de_pago(pago):
 
 
 def _liberar_reserva_bloqueada(pago, estado):
-    """Libera una reserva; el PagoPendiente debe venir bloqueado dentro de una transacción."""
+    # Libera una reserva  el PagoPendiente debe venir bloqueado dentro de una transaccion
     if not pago.reserva_activa:
         return
     try:
@@ -200,7 +329,7 @@ def _liberar_reserva_bloqueada(pago, estado):
 
 
 def _liberar_reservas_expiradas():
-    """Devuelve inventario retenido cuando Mercado Pago ya no debe usar esa preferencia."""
+    #Devuelve inventario retenido cuando Mercado Pago ya no debe usar esa preferencia
     with transaction.atomic():
         pagos = list(
             PagoPendiente.objects.select_for_update().filter(
@@ -210,10 +339,11 @@ def _liberar_reservas_expiradas():
         )
         for pago in pagos:
             _liberar_reserva_bloqueada(pago, 'EXPIRADO')
+    anonimizar_datos_vencidos()
 
 
 def _crear_pago_con_reserva(form, items, subtotal, entrega):
-    """Reserva las tallas por 15 minutos antes de redirigir al PSP."""
+    #Reserva las tallas por 15 minutos antes de redirigir al PSP
     _liberar_reservas_expiradas()
     with transaction.atomic():
         ids = [item['variante_id'] for item in items]
@@ -235,6 +365,7 @@ def _crear_pago_con_reserva(form, items, subtotal, entrega):
         pago = PagoPendiente.objects.create(
             rut=form.cleaned_data['rut'],
             nombre=form.cleaned_data['nombre'],
+            email=form.cleaned_data['email'],
             telefono=form.cleaned_data['telefono'],
             direccion=form.cleaned_data['direccion'],
             tipo_entrega=form.cleaned_data['tipo_entrega'],
@@ -287,7 +418,7 @@ def _extraer_id_pago(request):
 
 
 def _confirmar_pago(payment_id, referencia):
-    """Verifica el pago contra Mercado Pago y crea el pedido de manera atómica."""
+    # Verifica el pago contra Mercado Pago y crea el pedido de manera inmmediata
     if not re.fullmatch(r'\d{1,100}', str(payment_id)):
         raise PagoNoConfirmado('El identificador de pago no es válido.')
     try:
@@ -361,11 +492,22 @@ def _confirmar_pago(payment_id, referencia):
 
         cliente, creado = Cliente.objects.get_or_create(
             rut=pago.rut,
-            defaults={'nombre': pago.nombre, 'telefono': pago.telefono, 'direccion': pago.direccion},
+            defaults={
+                'nombre': pago.nombre,
+                'email': pago.email,
+                'telefono': pago.telefono,
+                'direccion': pago.direccion,
+            },
         )
         if not creado:
-            cliente.nombre, cliente.telefono, cliente.direccion = pago.nombre, pago.telefono, pago.direccion
-            cliente.save(update_fields=['nombre', 'telefono', 'direccion'])
+            cliente.nombre = pago.nombre
+            cliente.email = pago.email
+            cliente.telefono = pago.telefono
+            cliente.direccion = pago.direccion
+            cliente.save(update_fields=['nombre', 'email', 'telefono', 'direccion'])
+            if cliente.usuario_id and cliente.usuario.email != pago.email:
+                cliente.usuario.email = pago.email
+                cliente.usuario.save(update_fields=['email'])
 
         pedido = Pedido.objects.create(
             cliente=cliente,
@@ -399,8 +541,9 @@ def catalogo(request):
     _liberar_reservas_expiradas()
     query = (request.GET.get('q') or '').strip()
     categoria = request.GET.get('categoria', '')
-    categorias = Producto.CATEGORIAS
-    categorias_validas = {codigo for codigo, _ in categorias}
+    categorias = [(codigo, nombre) for codigo, nombre, _ in CATEGORIAS_CATALOGO]
+    categorias_por_codigo = {codigo: (nombre, incluidas) for codigo, nombre, incluidas in CATEGORIAS_CATALOGO}
+    categorias_validas = set(categorias_por_codigo)
     if categoria not in categorias_validas:
         categoria = ''
 
@@ -408,14 +551,216 @@ def catalogo(request):
     if query:
         productos = productos.filter(nombre__icontains=query)
     if categoria:
-        productos = productos.filter(categoria=categoria)
+        productos = productos.filter(categoria__in=categorias_por_codigo[categoria][1])
+    productos = list(productos.order_by('nombre').prefetch_related('variantes'))
+    categorias_publicas = {
+        categoria_interna: nombre
+        for _, nombre, categorias_internas in CATEGORIAS_CATALOGO
+        for categoria_interna in categorias_internas
+    }
+    for producto in productos:
+        producto.categoria_publica = categorias_publicas.get(
+            producto.categoria,
+            producto.get_categoria_display(),
+        )
     return render(request, 'index.html', {
-        'productos': productos.order_by('nombre'),
+        'productos': productos,
         'query': query,
         'categorias': categorias,
         'categoria_actual': categoria,
-        'categoria_actual_nombre': dict(categorias).get(categoria, ''),
+        'categoria_actual_nombre': categorias_por_codigo.get(categoria, ('', ()))[0],
     })
+
+
+def registro_cliente(request):
+    if request.user.is_authenticated:
+        return redirect('mi_cuenta' if _perfil_cliente(request) else 'catalogo')
+
+    desafio = _desafio_registro_vigente(request, renovar=request.method == 'GET')
+    form = RegistroClienteForm(
+        request.POST or None,
+        opciones_verificacion=desafio['opciones'],
+        prefix='registro',
+    )
+    if request.method == 'POST' and form.is_valid():
+        if set(form.cleaned_data['verificacion_humana']) != set(desafio['correctas']):
+            form.add_error('verificacion_humana', 'La selección no es correcta. Marca todas y solo las opciones solicitadas.')
+        else:
+            usuario_modelo = get_user_model()
+            with transaction.atomic():
+                usuario = usuario_modelo.objects.create_user(
+                    username=_nombre_usuario_cliente(),
+                    email=form.cleaned_data['email'],
+                    password=form.cleaned_data['password1'],
+                )
+                cliente = form.cliente_existente
+                if cliente:
+                    cliente.nombre = form.cleaned_data['nombre']
+                    cliente.email = form.cleaned_data['email']
+                    cliente.telefono = form.cleaned_data['telefono']
+                    cliente.usuario = usuario
+                    cliente.save(update_fields=['nombre', 'email', 'telefono', 'usuario'])
+                else:
+                    cliente = Cliente.objects.create(
+                        usuario=usuario,
+                        rut=form.cleaned_data['rut'],
+                        nombre=form.cleaned_data['nombre'],
+                        email=form.cleaned_data['email'],
+                        telefono=form.cleaned_data['telefono'],
+                        direccion='',
+                    )
+            login(request, usuario)
+            messages.success(request, 'Tu cuenta fue creada. Ya puedes comprar y revisar tus pedidos desde Mi cuenta.')
+            return redirect(_destino_seguro(request, 'catalogo'))
+
+    return _mostrar_acceso_cliente(
+        request,
+        formulario_registro=form,
+        desafio=desafio,
+        modo='registro',
+    )
+
+
+def iniciar_sesion_cliente(request):
+    if request.user.is_authenticated:
+        return redirect('mi_cuenta' if _perfil_cliente(request) else 'catalogo')
+
+    form = AccesoClienteForm(request.POST or None, prefix='ingreso')
+    if request.method == 'POST' and form.is_valid():
+        identificador = form.cleaned_data['identificador']
+        filtro = {'email__iexact': identificador} if '@' in identificador else {'telefono': identificador}
+        cliente = Cliente.objects.select_related('usuario').filter(
+            anonimizado_en__isnull=True,
+            **filtro,
+        ).first()
+        usuario = None
+        if cliente and cliente.usuario_id:
+            usuario = authenticate(
+                request,
+                username=cliente.usuario.username,
+                password=form.cleaned_data['password'],
+            )
+        if usuario and not usuario.is_staff:
+            login(request, usuario)
+            return redirect(_destino_seguro(request, 'catalogo'))
+        form.add_error(None, 'Correo/celular o contraseña incorrectos.')
+    return _mostrar_acceso_cliente(
+        request,
+        formulario_ingreso=form,
+        modo='ingreso',
+    )
+
+
+@require_POST
+@login_required(login_url='iniciar_sesion_cliente')
+def cerrar_sesion_cliente(request):
+    logout(request)
+    return redirect('catalogo')
+
+
+@login_required(login_url='iniciar_sesion_cliente')
+def mi_cuenta(request):
+    cliente = _perfil_cliente(request)
+    if not cliente:
+        return HttpResponseForbidden('Esta sesión no corresponde a una cuenta de cliente.')
+    pedidos = Pedido.objects.filter(cliente=cliente).prefetch_related(
+        'detallepedido_set__variante__producto',
+    ).order_by('-fecha')
+    return render(request, 'mi_cuenta.html', {
+        'cliente': cliente,
+        'direccion_form': DireccionClienteForm(instance=cliente),
+        'pedidos': pedidos,
+        'solicitudes': cliente.solicitudes_privacidad.all()[:5],
+    })
+
+
+@require_POST
+@login_required(login_url='iniciar_sesion_cliente')
+def actualizar_direccion_cliente(request):
+    cliente = _perfil_cliente(request)
+    if not cliente:
+        return HttpResponseForbidden('Esta sesión no corresponde a una cuenta de cliente.')
+    form = DireccionClienteForm(request.POST, instance=cliente)
+    if form.is_valid():
+        form.save()
+        messages.success(request, 'Tu dirección registrada fue actualizada.')
+        return redirect('mi_cuenta')
+
+    messages.error(request, 'No se actualizó la dirección. Revisa el dato indicado.')
+    pedidos = Pedido.objects.filter(cliente=cliente).prefetch_related(
+        'detallepedido_set__variante__producto',
+    ).order_by('-fecha')
+    return render(request, 'mi_cuenta.html', {
+        'cliente': cliente,
+        'direccion_form': form,
+        'pedidos': pedidos,
+        'solicitudes': cliente.solicitudes_privacidad.all()[:5],
+    }, status=400)
+
+
+@login_required(login_url='iniciar_sesion_cliente')
+def descargar_mis_datos(request):
+    cliente = _perfil_cliente(request)
+    if not cliente:
+        return HttpResponseForbidden('Esta sesión no corresponde a una cuenta de cliente.')
+    pedidos = Pedido.objects.filter(cliente=cliente).prefetch_related(
+        'detallepedido_set__variante__producto',
+    ).order_by('-fecha')
+    datos_pedidos = []
+    for pedido in pedidos:
+        productos = []
+        for detalle in pedido.detallepedido_set.all():
+            if detalle.variante_id:
+                productos.append({
+                    'producto': detalle.variante.producto.nombre,
+                    'talla': detalle.variante.talla,
+                    'cantidad': detalle.cantidad,
+                    'precio_unitario': detalle.precio_unitario,
+                })
+        datos_pedidos.append({
+            'codigo_seguimiento': pedido.codigo_seguimiento,
+            'fecha': pedido.fecha.isoformat(),
+            'estado': pedido.estado,
+            'tipo_entrega': pedido.tipo_entrega,
+            'costo_despacho': pedido.costo_despacho,
+            'plazo_entrega': pedido.plazo_entrega,
+            'productos': productos,
+        })
+    respuesta = HttpResponse(
+        json.dumps({
+            'perfil': {
+                'rut': cliente.rut,
+                'nombre': cliente.nombre,
+                'email': cliente.email,
+                'telefono': cliente.telefono,
+                'direccion': cliente.direccion,
+            },
+            'pedidos': datos_pedidos,
+        }, ensure_ascii=False, indent=2),
+        content_type='application/json; charset=utf-8',
+    )
+    respuesta['Content-Disposition'] = 'attachment; filename="mis-datos-logisflow.json"'
+    return respuesta
+
+
+@login_required(login_url='iniciar_sesion_cliente')
+def solicitar_privacidad(request):
+    cliente = _perfil_cliente(request)
+    if not cliente:
+        return HttpResponseForbidden('Esta sesión no corresponde a una cuenta de cliente.')
+    tipo_solicitado = request.GET.get('tipo', '')
+    tipos_validos = {codigo for codigo, _ in SolicitudPrivacidad.TIPOS}
+    form = SolicitudPrivacidadForm(
+        request.POST or None,
+        initial={'tipo': tipo_solicitado} if tipo_solicitado in tipos_validos else None,
+    )
+    if request.method == 'POST' and form.is_valid():
+        solicitud = form.save(commit=False)
+        solicitud.cliente = cliente
+        solicitud.save()
+        messages.success(request, 'Recibimos tu solicitud. Podrás ver su estado en Mi cuenta.')
+        return redirect('mi_cuenta')
+    return render(request, 'solicitar_privacidad.html', {'form': form})
 
 
 def producto_detalle(request, producto_id):
@@ -467,6 +812,7 @@ def ver_carrito(request):
     if not carrito_original:
         return render(request, 'carrito.html', {
             'carrito': {}, 'total': 0, 'carrito_expirado': carrito_expirado,
+            'carrito_duracion_minutos': CARRITO_DURACION_MINUTOS,
         })
     try:
         carrito, _, total = _normalizar_carrito(carrito_original)
@@ -478,6 +824,7 @@ def ver_carrito(request):
         'carrito': carrito,
         'total': total,
         'carrito_expira_en_timestamp': expiracion or request.session.get('carrito_expira_en'),
+        'carrito_duracion_minutos': CARRITO_DURACION_MINUTOS,
     })
 
 
@@ -533,7 +880,7 @@ def crear_pedido(request):
     _liberar_reservas_expiradas()
     carrito_original, expirado, expiracion = _obtener_carrito_vigente(request)
     if expirado:
-        messages.info(request, 'Tu carrito expiró después de 24 horas sin cambios.')
+        messages.info(request, 'Tu carrito expiró después de 15 minutos sin cambios.')
         return redirect('ver_carrito')
     try:
         carrito, items, total = _normalizar_carrito(carrito_original)
@@ -542,7 +889,20 @@ def crear_pedido(request):
         return redirect('ver_carrito')
     _guardar_carrito(request, carrito)
 
-    form = CheckoutForm(request.POST or None)
+    cliente_sesion = _perfil_cliente(request)
+    datos_iniciales = {}
+    if cliente_sesion:
+        datos_iniciales = {
+            'rut': cliente_sesion.rut,
+            'nombre': cliente_sesion.nombre,
+            'email': cliente_sesion.email,
+            'telefono': cliente_sesion.telefono,
+            'direccion': cliente_sesion.direccion,
+        }
+    form = CheckoutForm(request.POST or None, initial=datos_iniciales)
+    if cliente_sesion:
+        for campo in ('rut', 'nombre', 'email', 'telefono'):
+            form.fields[campo].widget.attrs['readonly'] = 'readonly'
     tipo_entrega = request.POST.get('tipo_entrega') if request.method == 'POST' else None
     estacion_metro = request.POST.get('estacion_metro') if request.method == 'POST' else None
     try:
@@ -554,6 +914,20 @@ def crear_pedido(request):
         )
     except ValueError:
         entrega_previsualizada = None
+    if request.method == 'POST' and form.is_valid() and cliente_sesion:
+        campos_protegidos = {
+            'rut': cliente_sesion.rut,
+            'nombre': cliente_sesion.nombre,
+            'email': cliente_sesion.email or '',
+            'telefono': cliente_sesion.telefono or '',
+        }
+        for campo, valor_registrado in campos_protegidos.items():
+            if form.cleaned_data[campo] != valor_registrado:
+                form.add_error(
+                    campo,
+                    'Este dato está protegido en tu cuenta. Solicita una rectificación si necesitas cambiarlo.',
+                )
+
     if request.method == 'POST' and form.is_valid():
         entrega = informacion_entrega(
             form.cleaned_data['tipo_entrega'],
@@ -612,7 +986,7 @@ def crear_pedido(request):
         'opciones_entrega': OPCIONES_ENTREGA,
         'estaciones_metro': estaciones_metro_para_checkout(),
         'carrito_expira_en_timestamp': expiracion or request.session.get('carrito_expira_en'),
-        'carrito_duracion_horas': CARRITO_DURACION_HORAS,
+        'carrito_duracion_minutos': CARRITO_DURACION_MINUTOS,
     })
 
 
@@ -667,6 +1041,14 @@ def politicas_despacho(request):
     })
 
 
+def terminos_condiciones(request):
+    return render(request, 'terminos_condiciones.html')
+
+
+def politica_privacidad(request):
+    return render(request, 'politica_privacidad.html')
+
+
 @staff_member_required(login_url='login')
 @require_POST
 def actualizar_estado_pedido(request):
@@ -675,6 +1057,22 @@ def actualizar_estado_pedido(request):
     if pedido.estado != 'Entregado' and nuevo_estado in dict(Pedido.ESTADOS) and nuevo_estado != 'Pendiente':
         pedido.estado = nuevo_estado
         pedido.save(update_fields=['estado'])
+    return redirect('dashboard')
+
+
+@staff_member_required(login_url='login')
+@require_POST
+def resolver_solicitud_privacidad(request, solicitud_id):
+    solicitud = get_object_or_404(SolicitudPrivacidad.objects.select_related('cliente'), id=solicitud_id)
+    accion = request.POST.get('accion')
+    if accion == 'anonimizar' and solicitud.tipo == 'SUPRESION' and solicitud.cliente:
+        solicitud.cliente.anonimizar()
+    elif accion != 'resolver':
+        return HttpResponseBadRequest('La acción de privacidad no es válida.')
+    solicitud.estado = 'RESUELTA'
+    solicitud.resuelto_en = timezone.now()
+    solicitud.save(update_fields=['estado', 'resuelto_en'])
+    messages.success(request, 'La solicitud de privacidad fue actualizada.')
     return redirect('dashboard')
 
 
@@ -694,6 +1092,9 @@ def dashboard(request):
         'stock_critico': VarianteProducto.objects.filter(stock__lte=F('stock_reservado') + 3).count(), 'pedidos_pendientes': abandonados.count(),
         'ticket_promedio': int(ingresos_totales / pedidos_pagados) if pedidos_pagados else 0,
         'clientes_totales': Cliente.objects.count(),
+        'solicitudes_privacidad': SolicitudPrivacidad.objects.select_related('cliente').filter(
+            estado__in=['PENDIENTE', 'EN_REVISION'],
+        ),
     }
     return render(request, 'dashboard.html', context)
 

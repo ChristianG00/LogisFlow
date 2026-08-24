@@ -2,12 +2,14 @@ import re
 import secrets
 import uuid
 
+from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 
 def generar_codigo_seguimiento():
-    """Código público no secuencial para que el cliente rastree un pedido."""
+    # Crea un cidigo de seguimiento unico para cada pedido, con formato LF-XXXXXXXXXX
     return f'LF-{secrets.token_hex(5).upper()}'
 
 class Producto(models.Model):
@@ -86,19 +88,62 @@ class VarianteProducto(models.Model):
 
 
 class Cliente(models.Model):
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='perfil_cliente',
+    )
     rut = models.CharField(max_length=12, unique=True)
     nombre = models.CharField(max_length=100)
-    telefono = models.CharField(max_length=20)
+    email = models.EmailField(max_length=254, unique=True, null=True, blank=True)
+    telefono = models.CharField(max_length=20, unique=True, null=True, blank=True)
     direccion = models.CharField(max_length=200)
+    anonimizado_en = models.DateTimeField(null=True, blank=True, editable=False)
 
     def __str__(self):
         return self.nombre
 
     @property
     def telefono_whatsapp(self):
-        """Número E.164 sin símbolos, apto para los enlaces wa.me."""
-        numero = ''.join(re.findall(r'\d', self.telefono))
+        # Convierte el telefono a formato internacional para WhatsApp (ej. 569XXXXXXXX)
+        numero = ''.join(re.findall(r'\d', self.telefono or ''))
         return f'56{numero}' if re.fullmatch(r'9\d{8}', numero) else numero
+
+    def anonimizar(self):
+        # Anonimiza los datos del cliente y de sus pagos pendientes, conservando importes y estados para auditoría
+        if self.anonimizado_en:
+            return
+
+        usuario = self.usuario if self.usuario_id else None
+        pagos_asociados = list(
+            PagoPendiente.objects.filter(pedido__cliente=self, anonimizado_en__isnull=True)
+        )
+        self.usuario = None
+        self.rut = f'AN{self.pk:010d}'
+        self.nombre = 'Cliente anonimizado'
+        self.email = None
+        self.telefono = None
+        self.direccion = ''
+        self.anonimizado_en = timezone.now()
+        self.save(update_fields=[
+            'usuario', 'rut', 'nombre', 'email', 'telefono', 'direccion', 'anonimizado_en',
+        ])
+
+        for pago in pagos_asociados:
+            pago.anonimizar()
+
+        if usuario:
+            usuario.username = f'cuenta-eliminada-{usuario.pk}-{secrets.token_hex(4)}'
+            usuario.first_name = ''
+            usuario.last_name = ''
+            usuario.email = ''
+            usuario.is_active = False
+            usuario.set_unusable_password()
+            usuario.save(update_fields=[
+                'username', 'first_name', 'last_name', 'email', 'is_active', 'password',
+            ])
 
 
 class Pedido(models.Model):
@@ -135,7 +180,7 @@ class Pedido(models.Model):
         return f"Pedido #{self.id} - {self.cliente.nombre}"
 
     def save(self, *args, **kwargs):
-        """Evita una colisión extremadamente improbable al crear un código público."""
+        # Genera un codigo de seguimiento unico si no existe o si ya esta en uso
         if self._state.adding:
             while not self.codigo_seguimiento or type(self).objects.filter(
                 codigo_seguimiento=self.codigo_seguimiento,
@@ -144,7 +189,7 @@ class Pedido(models.Model):
         super().save(*args, **kwargs)
 
     def get_tipo_entrega_display(self):
-        """Mantiene una etiqueta legible sin cambiar datos existentes de la BD."""
+        # Devuelve el nombre legible del tipo de entrega, o el valor original si no está en la lista de opciones
         return self.TIPOS_ENTREGA.get(self.tipo_entrega, self.tipo_entrega)
 
 
@@ -159,7 +204,7 @@ class DetallePedido(models.Model):
 
 
 class PagoPendiente(models.Model):
-    """Datos de un intento de pago. No representa una venta ni un pedido."""
+    # Estado de un pago pendiente, con información de contacto y detalles. No representa una venta ni un pedido
 
     ESTADOS = [
         ('PENDIENTE', 'Pendiente de pago'),
@@ -172,6 +217,7 @@ class PagoPendiente(models.Model):
     referencia = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     rut = models.CharField(max_length=12)
     nombre = models.CharField(max_length=100)
+    email = models.EmailField(max_length=254, null=True, blank=True)
     telefono = models.CharField(max_length=20)
     direccion = models.CharField(max_length=200)
     tipo_entrega = models.CharField(max_length=50)
@@ -190,6 +236,7 @@ class PagoPendiente(models.Model):
     mercadopago_payment_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
     pedido = models.OneToOneField(Pedido, on_delete=models.SET_NULL, null=True, blank=True, related_name='pago')
     creado_en = models.DateTimeField(auto_now_add=True)
+    anonimizado_en = models.DateTimeField(null=True, blank=True, editable=False)
 
     def __str__(self):
         return f"Pago {self.referencia} ({self.estado})"
@@ -198,3 +245,51 @@ class PagoPendiente(models.Model):
     def telefono_whatsapp(self):
         numero = ''.join(re.findall(r'\d', self.telefono))
         return f'56{numero}' if re.fullmatch(r'9\d{8}', numero) else numero
+
+    def anonimizar(self):
+        # Conserva importes/estado para auditoría, pero quita datos de contacto.
+        if self.anonimizado_en:
+            return
+        self.rut = f'AP{self.pk:010d}'
+        self.nombre = 'Cliente anonimizado'
+        self.email = None
+        self.telefono = ''
+        self.direccion = ''
+        self.anonimizado_en = timezone.now()
+        self.save(update_fields=['rut', 'nombre', 'email', 'telefono', 'direccion', 'anonimizado_en'])
+
+
+class SolicitudPrivacidad(models.Model):
+    TIPOS = [
+        ('ACCESO', 'Acceso a mis datos'),
+        ('RECTIFICACION', 'Rectificación de datos'),
+        ('SUPRESION', 'Supresión o anonimización'),
+        ('OPOSICION', 'Oposición al tratamiento'),
+        ('PORTABILIDAD', 'Portabilidad de datos'),
+        ('BLOQUEO', 'Bloqueo temporal del tratamiento'),
+    ]
+    ESTADOS = [
+        ('PENDIENTE', 'Pendiente'),
+        ('EN_REVISION', 'En revisión'),
+        ('RESUELTA', 'Resuelta'),
+        ('RECHAZADA', 'Rechazada'),
+    ]
+
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='solicitudes_privacidad',
+    )
+    tipo = models.CharField(max_length=20, choices=TIPOS)
+    detalle = models.TextField(max_length=1000, blank=True)
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='PENDIENTE')
+    creado_en = models.DateTimeField(auto_now_add=True)
+    resuelto_en = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-creado_en']
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} · {self.get_estado_display()}'
