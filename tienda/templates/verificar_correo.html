@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifica tu correo · LogisFlow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root { --ink:#34233d; --brand:#b4487a; --brand-dark:#93365f; } body { min-height:100vh; color:var(--ink); background:radial-gradient(circle at 5% 8%,#fbe2ee 0,transparent 30rem),radial-gradient(circle at 95% 88%,#e8d8f2 0,transparent 28rem),#fcf7fa; }
+        .shell { max-width:760px; } .card-verify { border:0; border-radius:26px; box-shadow:0 20px 54px rgba(75,36,64,.14); } .brand { color:var(--brand); }
+        .icon-circle { width:62px; height:62px; display:grid; place-items:center; border-radius:50%; color:#fff; background:linear-gradient(145deg,#7c3f69,#b4487a); font-size:1.5rem; }
+        .form-control { min-height:48px; border-radius:11px; border-color:#dcdde6; } .form-control:focus { border-color:#d67da7; box-shadow:0 0 0 .2rem rgba(180,72,122,.13); }
+        .btn-primary { --bs-btn-bg:#b4487a; --bs-btn-border-color:#b4487a; --bs-btn-hover-bg:#93365f; --bs-btn-hover-border-color:#93365f; }
+    </style>
+</head>
+<body class="d-flex flex-column">
+    <main class="container shell flex-grow-1 d-flex align-items-center py-4 py-lg-5">
+        <section class="card card-verify w-100"><div class="card-body p-4 p-md-5">
+            <div class="icon-circle mb-4"><i class="bi bi-envelope-check"></i></div>
+            {% if enlace_invalido %}
+                <p class="small fw-bold brand mb-2">ENLACE NO DISPONIBLE</p><h1 class="h3 fw-bold">Este enlace ya no es válido.</h1><p class="text-secondary mb-4">Puede haber expirado, ya fue utilizado o no corresponde a una cuenta pendiente de confirmación. Solicita uno nuevo para continuar.</p>
+            {% elif correo_enviado %}
+                <p class="small fw-bold brand mb-2">CORREO ENVIADO</p><h1 class="h3 fw-bold">Confirma tu correo para activar la cuenta.</h1><p class="text-secondary mb-4">Revisa tu bandeja de entrada y spam. Abre el enlace temporal del mensaje antes de iniciar sesión.</p>
+            {% else %}
+                <p class="small fw-bold brand mb-2">REENVIAR VERIFICACIÓN</p><h1 class="h3 fw-bold">Solicita otro enlace.</h1><p class="text-secondary mb-4">Ingresa el correo usado al crear tu cuenta. Por seguridad, mostraremos el mismo resultado aunque no exista una cuenta pendiente.</p>
+            {% endif %}
+            {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags|default:'danger' }} rounded-3 small">{{ message }}</div>{% endfor %}{% endif %}
+            <div class="border-top pt-4 mt-4"><h2 class="h6 fw-bold">¿No recibiste el correo?</h2><p class="text-secondary small">Puedes solicitar un nuevo enlace. Nunca compartas estos enlaces con otra persona.</p>
+                <form method="post" action="{% url 'reenviar_verificacion_correo_cliente' %}" novalidate>{% csrf_token %}{% if form.non_field_errors %}<div class="alert alert-danger rounded-3 small">{{ form.non_field_errors|striptags }}</div>{% endif %}
+                    <div class="mb-3"><label class="form-label fw-semibold" for="{{ form.email.id_for_label }}">Correo electrónico</label>{{ form.email }}{% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors|striptags }}</div>{% endif %}</div><div class="mb-3"><div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div></div>
+                    <button class="btn btn-outline-primary fw-bold" type="submit">Reenviar enlace</button>
+                </form>
+            </div>
+            <p class="text-center small text-secondary mt-4 mb-0"><a class="brand fw-semibold text-decoration-none" href="{% url 'iniciar_sesion_cliente' %}"><i class="bi bi-arrow-left me-1"></i>Volver a iniciar sesión</a></p>
+        </div></section>
+    </main>
+    {% include "partials/footer.html" %}<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+</body>
+</html>

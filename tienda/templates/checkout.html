@@ -44,7 +44,7 @@
     <nav class="checkout-nav py-3">
         <div class="container checkout-shell d-flex align-items-center justify-content-between">
             <a class="text-decoration-none fw-bold fs-5 text-primary" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a>
-            <a href="{% url 'ver_carrito' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-arrow-left me-1"></i> Volver al carrito</a>
+            <div class="d-flex gap-2"><a href="{% url 'solicitar_privacidad' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-chat-heart me-1"></i>Soporte</a><a href="{% url 'ver_carrito' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-arrow-left me-1"></i> Volver al carrito</a></div>
         </div>
     </nav>
 
@@ -290,5 +290,6 @@
             }
         });
     </script>
+    {% include "partials/footer.html" %}
 </body>
 </html>

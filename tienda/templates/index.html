@@ -44,8 +44,6 @@
         .product-purchase { margin-top: 1.15rem; padding-top: 1rem; border-top: 1px solid #f0e7ec; }
         .product-button { border-radius: 12px; min-height: 44px; }
         .empty-state { border: 1px dashed #cad4e4; border-radius: 20px; background: rgba(255,255,255,.7); padding: 4rem 1.5rem; }
-        .footer { background: var(--ink); color: #d9e1ee; }
-        .footer a { color: #aebbd0; }
         .btn-primary { --bs-btn-bg: #b4487a; --bs-btn-border-color: #b4487a; --bs-btn-hover-bg: #93365f; --bs-btn-hover-border-color: #93365f; --bs-btn-active-bg: #7a294e; --bs-btn-active-border-color: #7a294e; }
         .text-primary { color: var(--brand) !important; }
         @media (max-width: 767px) { .hero { border-radius: 0 0 24px 24px; margin-left: -12px; margin-right: -12px; } .product-image-wrap { height: 220px; } }
@@ -112,6 +110,6 @@
         </section>
     </main>
 
-    <footer class="footer py-4 mt-auto"><div class="container store-shell d-flex flex-wrap justify-content-between align-items-center gap-2"><div><strong>LOGISFLOW</strong><span class="small ms-2">Moda femenina, compra y despacho con información clara.</span></div><div class="d-flex gap-3 small">{% if user.is_authenticated and not user.is_staff %}<a href="{% url 'mi_cuenta' %}" class="text-decoration-none">Mi cuenta</a>{% endif %}<a href="{% url 'politicas_despacho' %}" class="text-decoration-none">Despacho</a><a href="{% url 'terminos_condiciones' %}" class="text-decoration-none">Términos y privacidad</a><a href="{% url 'seguimiento' %}" class="text-decoration-none">Seguimiento</a><a href="{% url 'login' %}" class="text-decoration-none"><i class="bi bi-shield-lock me-1"></i>Administración</a></div></div></footer>
+    {% include "partials/footer.html" with mostrar_administracion=True %}
 </body>
 </html>

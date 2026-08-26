@@ -9,7 +9,7 @@ from .models import Cliente, Producto, SolicitudPrivacidad, VarianteProducto
 
 
 def normalizar_rut(rut):
-    """Valida el dígito verificador y devuelve el formato canónico 12345678-9."""
+    # Valida y deja el RUT en formato 12345678-9
     rut_limpio = re.sub(r'[.\-\s]', '', str(rut)).upper()
     if not re.fullmatch(r'\d{7,8}[0-9K]', rut_limpio):
         raise ValueError('El formato del RUT no es válido.')
@@ -68,7 +68,6 @@ class CheckoutForm(forms.Form):
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: 912345678'})
     )
     
-    # Hemos separado los tipos de entrega estratégicamente
     ENTREGA_CHOICES = [
         ('', '--- Selecciona un método ---'),
         ('Retiro', 'Retiro por el cliente en domicilio del vendedor'),
@@ -99,10 +98,6 @@ class CheckoutForm(forms.Form):
         error_messages={'required': 'Debes aceptar los términos, despacho y política de privacidad para continuar.'},
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
-
-    # ==========================================
-    # VALIDACIONES ESTRICTAS (NIVEL TESIS)
-    # ==========================================
 
     def clean_rut(self):
         try:
@@ -142,7 +137,7 @@ class CheckoutForm(forms.Form):
         ).exclude(rut=rut).exists():
             self.add_error('email', 'Este correo ya está asociado a otro RUT. Usa un correo personal distinto.')
 
-        # La dirección se determina en el servidor, nunca solo en JavaScript.
+        # El servidor decide la dirección según la entrega elegida
         if tipo_entrega == 'Retiro':
             cleaned_data['direccion'] = 'Retiro en domicilio (La Granja)'
             return cleaned_data
@@ -169,8 +164,8 @@ class CheckoutForm(forms.Form):
         return cleaned_data
 
 
+# Valida los datos del producto antes de guardarlo
 class ProductoForm(forms.ModelForm):
-    """Valida el inventario antes de guardarlo; no confía en los campos HTML."""
 
     class Meta:
         model = Producto
@@ -227,15 +222,6 @@ class RegistroClienteForm(forms.Form):
             'class': 'form-control', 'placeholder': 'Ej: 912345678', 'autocomplete': 'tel',
         }),
     )
-    verificacion_humana = forms.MultipleChoiceField(
-        choices=(),
-        required=True,
-        error_messages={
-            'required': 'Selecciona las opciones indicadas para verificar que eres una persona.',
-            'invalid_choice': 'Una opción de verificación no es válida. Recarga la página e inténtalo otra vez.',
-        },
-        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
-    )
     password1 = forms.CharField(
         error_messages={'required': 'Crea una contraseña para proteger tu cuenta.'},
         widget=forms.PasswordInput(attrs={
@@ -255,9 +241,7 @@ class RegistroClienteForm(forms.Form):
     )
 
     def __init__(self, *args, **kwargs):
-        opciones_verificacion = kwargs.pop('opciones_verificacion', ())
         super().__init__(*args, **kwargs)
-        self.fields['verificacion_humana'].choices = opciones_verificacion
         self.cliente_existente = None
 
     def clean_rut(self):
@@ -358,6 +342,22 @@ class SolicitudRecuperacionClaveClienteForm(forms.Form):
         return normalizar_email(self.cleaned_data.get('email', ''))
 
 
+class ReenviarVerificacionCorreoForm(forms.Form):
+    email = forms.EmailField(
+        max_length=254,
+        error_messages={
+            'required': 'Ingresa el correo con el que creaste tu cuenta.',
+            'invalid': 'Ingresa un correo electrónico válido, por ejemplo nombre@correo.cl.',
+        },
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control', 'placeholder': 'nombre@correo.cl', 'autocomplete': 'email',
+        }),
+    )
+
+    def clean_email(self):
+        return normalizar_email(self.cleaned_data.get('email', ''))
+
+
 class RestablecerClaveClienteForm(forms.Form):
     password1 = forms.CharField(
         error_messages={'required': 'Crea una nueva contraseña.'},
@@ -390,8 +390,8 @@ class RestablecerClaveClienteForm(forms.Form):
         return cleaned
 
 
+# La clienta solo puede editar su dirección desde la cuenta
 class DireccionClienteForm(forms.ModelForm):
-    """La dirección es el único dato de cuenta que la clienta puede actualizar directamente."""
 
     class Meta:
         model = Cliente
@@ -411,14 +411,58 @@ class DireccionClienteForm(forms.ModelForm):
         return direccion
 
 
-class SolicitudPrivacidadForm(forms.ModelForm):
-    class Meta:
-        model = SolicitudPrivacidad
-        fields = ['tipo', 'detalle']
-        widgets = {
-            'tipo': forms.Select(attrs={'class': 'form-select'}),
-            'detalle': forms.Textarea(attrs={
-                'class': 'form-control', 'rows': 4,
-                'placeholder': 'Indica qué datos, pedido o tratamiento quieres consultar.',
-            }),
-        }
+class SolicitudPrivacidadForm(forms.Form):
+    tipo = forms.ChoiceField(
+        choices=SolicitudPrivacidad.TIPOS_SOPORTE,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    detalle = forms.CharField(
+        min_length=10,
+        max_length=1000,
+        error_messages={
+            'required': 'Describe brevemente en qué podemos ayudarte.',
+            'min_length': 'Entrega al menos 10 caracteres para poder revisar tu caso.',
+        },
+        widget=forms.Textarea(attrs={
+            'class': 'form-control', 'rows': 4,
+            'placeholder': 'Describe tu consulta. No incluyas contraseñas, datos de tarjeta ni códigos de pago.',
+        }),
+    )
+
+    def clean_detalle(self):
+        detalle = ' '.join(self.cleaned_data.get('detalle', '').split())
+        if len(detalle) < 10:
+            raise ValidationError('Entrega al menos 10 caracteres para poder revisar tu caso.')
+        return detalle
+
+
+# Para compras invitadas se pide RUT y código de seguimiento
+class SoporteInvitadoForm(SolicitudPrivacidadForm):
+    rut = forms.CharField(
+        max_length=12,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control', 'placeholder': 'Ej: 12.345.678-9', 'autocomplete': 'off',
+        }),
+    )
+    codigo_seguimiento = forms.CharField(
+        max_length=13,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control', 'placeholder': 'Ej: LF-A1B2C3D4E5', 'autocomplete': 'off',
+        }),
+    )
+    tipo = forms.ChoiceField(
+        choices=[opcion for opcion in SolicitudPrivacidad.TIPOS_SOPORTE if opcion[0] != 'CUENTA'],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+    def clean_rut(self):
+        try:
+            return normalizar_rut(self.cleaned_data.get('rut', ''))
+        except ValueError as error:
+            raise ValidationError(str(error))
+
+    def clean_codigo_seguimiento(self):
+        codigo = str(self.cleaned_data.get('codigo_seguimiento', '')).strip().upper()
+        if not re.fullmatch(r'LF-[A-F0-9]{10}', codigo):
+            raise ValidationError('Ingresa el código de seguimiento con formato LF-XXXXXXXXXX.')
+        return codigo

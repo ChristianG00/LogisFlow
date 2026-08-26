@@ -39,6 +39,7 @@
         <div class="container">
             <a class="navbar-brand fw-bold" href="{% url 'catalogo' %}"><i class="bi bi-shop me-2"></i>LogisFlow</a>
             <span class="navbar-text text-white-50"><i class="bi bi-magic me-1"></i> Asesor Heurístico de Outfits</span>
+            <a class="btn btn-sm btn-outline-light rounded-pill" href="{% url 'solicitar_privacidad' %}"><i class="bi bi-chat-heart me-1"></i>Soporte</a>
         </div>
     </nav>
 
@@ -148,6 +149,7 @@
 
     </div>
 
+    {% include "partials/footer.html" %}
 </body>
 
 </html>

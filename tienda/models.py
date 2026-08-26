@@ -9,7 +9,7 @@ from django.utils import timezone
 
 
 def generar_codigo_seguimiento():
-    # Crea un cidigo de seguimiento unico para cada pedido, con formato LF-XXXXXXXXXX
+    # Código público para consultar un pedido
     return f'LF-{secrets.token_hex(5).upper()}'
 
 class Producto(models.Model):
@@ -48,7 +48,7 @@ class Producto(models.Model):
     precio = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     imagen = models.ImageField(upload_to='productos/', null=True, blank=True)
     
-    # Campos del motor heuristico
+    # Datos usados por el recomendador
     categoria = models.CharField(max_length=15, choices=CATEGORIAS, default='SUPERIOR')
     color_base = models.CharField(max_length=15, choices=COLORES, default='NEGRO')
     estilo = models.CharField(max_length=15, choices=ESTILOS, default='CASUAL')
@@ -107,12 +107,12 @@ class Cliente(models.Model):
 
     @property
     def telefono_whatsapp(self):
-        # Convierte el telefono a formato internacional para WhatsApp (ej. 569XXXXXXXX)
+        # Número apto para enlaces de WhatsApp
         numero = ''.join(re.findall(r'\d', self.telefono or ''))
         return f'56{numero}' if re.fullmatch(r'9\d{8}', numero) else numero
 
     def anonimizar(self):
-        # Anonimiza los datos del cliente y de sus pagos pendientes, conservando importes y estados para auditoría
+        # Conserva el pedido, pero elimina datos personales
         if self.anonimizado_en:
             return
 
@@ -180,7 +180,7 @@ class Pedido(models.Model):
         return f"Pedido #{self.id} - {self.cliente.nombre}"
 
     def save(self, *args, **kwargs):
-        # Genera un codigo de seguimiento unico si no existe o si ya esta en uso
+        # Reintenta si el código de seguimiento ya existe
         if self._state.adding:
             while not self.codigo_seguimiento or type(self).objects.filter(
                 codigo_seguimiento=self.codigo_seguimiento,
@@ -189,7 +189,7 @@ class Pedido(models.Model):
         super().save(*args, **kwargs)
 
     def get_tipo_entrega_display(self):
-        # Devuelve el nombre legible del tipo de entrega, o el valor original si no está en la lista de opciones
+        # Muestra un nombre legible para la entrega
         return self.TIPOS_ENTREGA.get(self.tipo_entrega, self.tipo_entrega)
 
 
@@ -203,8 +203,8 @@ class DetallePedido(models.Model):
         return f"{self.cantidad} x {self.variante.producto.nombre} (Talla {self.variante.talla})"
 
 
+# Un intento de pago todavía no es una venta
 class PagoPendiente(models.Model):
-    # Estado de un pago pendiente, con información de contacto y detalles. No representa una venta ni un pedido
 
     ESTADOS = [
         ('PENDIENTE', 'Pendiente de pago'),
@@ -247,7 +247,7 @@ class PagoPendiente(models.Model):
         return f'56{numero}' if re.fullmatch(r'9\d{8}', numero) else numero
 
     def anonimizar(self):
-        # Conserva importes/estado para auditoría, pero quita datos de contacto.
+        # Conserva el historial, pero elimina datos personales
         if self.anonimizado_en:
             return
         self.rut = f'AP{self.pk:010d}'
@@ -259,7 +259,14 @@ class PagoPendiente(models.Model):
         self.save(update_fields=['rut', 'nombre', 'email', 'telefono', 'direccion', 'anonimizado_en'])
 
 
+# Usa el registro existente para las consultas de soporte
 class SolicitudPrivacidad(models.Model):
+    TIPOS_SOPORTE = [
+        ('PEDIDO', 'Pedido, pago o seguimiento'),
+        ('DESPACHO', 'Despacho o entrega'),
+        ('CUENTA', 'Cuenta, datos o acceso'),
+        ('OTRO', 'Otra consulta'),
+    ]
     TIPOS = [
         ('ACCESO', 'Acceso a mis datos'),
         ('RECTIFICACION', 'Rectificación de datos'),
@@ -290,6 +297,10 @@ class SolicitudPrivacidad(models.Model):
 
     class Meta:
         ordering = ['-creado_en']
+
+    def get_tipo_display(self):
+        etiquetas = dict(self.TIPOS_SOPORTE + self.TIPOS)
+        return etiquetas.get(self.tipo, self.tipo)
 
     def __str__(self):
         return f'{self.get_tipo_display()} · {self.get_estado_display()}'

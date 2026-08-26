@@ -5,6 +5,9 @@ import re
 import secrets
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+from urllib.error import URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 import mercadopago
 from django.conf import settings
@@ -30,8 +33,10 @@ from .forms import (
     CheckoutForm,
     DireccionClienteForm,
     ProductoForm,
+    ReenviarVerificacionCorreoForm,
     RestablecerClaveClienteForm,
     RegistroClienteForm,
+    SoporteInvitadoForm,
     SolicitudRecuperacionClaveClienteForm,
     SolicitudPrivacidadForm,
     TallaForm,
@@ -52,8 +57,7 @@ MAX_CANTIDAD_POR_LINEA = 1000
 CARRITO_DURACION_MINUTOS = 15
 RESERVA_DURACION_MINUTOS = 15
 
-# Las categorías generales se conservan para los productos antiguos, pero no se
-# muestran como secciones duplicadas en la tienda pública.
+# Agrupa las categorías antiguas sin repetirlas en la tienda
 CATEGORIAS_CATALOGO = (
     ('POLERAS', 'Poleras y tops', ('POLERAS', 'SUPERIOR')),
     ('BLUSAS', 'Blusas', ('BLUSAS',)),
@@ -102,50 +106,29 @@ def _nombre_usuario_cliente():
             return nombre
 
 
-def _nuevo_desafio_registro(request):
-    """CAPTCHA de selección aleatoria, validado contra la respuesta guardada en sesión."""
-    opciones = (
-        ('bus', '🚌 Autobús', 'transporte'),
-        ('bicicleta', '🚲 Bicicleta', 'transporte'),
-        ('auto', '🚗 Automóvil', 'transporte'),
-        ('blusa', '👚 Blusa', 'prenda'),
-        ('vestido', '👗 Vestido', 'prenda'),
-        ('zapato', '👠 Zapato', 'prenda'),
-        ('flor', '🌷 Flor', 'naturaleza'),
-        ('arbol', '🌳 Árbol', 'naturaleza'),
-        ('sol', '☀️ Sol', 'naturaleza'),
+def _enviar_verificacion_correo_cliente(request, cliente):
+    # Envía el enlace para activar la cuenta
+    usuario = cliente.usuario
+    uidb64 = urlsafe_base64_encode(force_bytes(usuario.pk))
+    token = default_token_generator.make_token(usuario)
+    enlace = request.build_absolute_uri(reverse(
+        'verificar_correo_cliente',
+        kwargs={'uidb64': uidb64, 'token': token},
+    ))
+    send_mail(
+        subject='Confirma tu correo de LogisFlow',
+        message=(
+            f'Hola {cliente.nombre},\n\n'
+            'Para activar tu cuenta cliente y confirmar que este correo te pertenece, '
+            'abre este enlace temporal:\n\n'
+            f'{enlace}\n\n'
+            'Si no creaste una cuenta en LogisFlow, puedes ignorar este correo. '
+            'No compartas este enlace con nadie.'
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[cliente.email],
+        fail_silently=False,
     )
-    desafios = {
-        'transporte': 'Selecciona todos los medios de transporte',
-        'prenda': 'Selecciona todas las prendas de vestir',
-        'naturaleza': 'Selecciona todos los elementos de naturaleza',
-    }
-    categoria = secrets.choice(tuple(desafios))
-    correctas = [codigo for codigo, _, grupo in opciones if grupo == categoria]
-    distractores = [opcion for opcion in opciones if opcion[2] != categoria]
-    opciones_visibles = [opcion for opcion in opciones if opcion[2] == categoria]
-    opciones_visibles += secrets.SystemRandom().sample(distractores, 3)
-    secrets.SystemRandom().shuffle(opciones_visibles)
-    request.session['desafio_registro'] = {
-        'instruccion': desafios[categoria],
-        'opciones': [[codigo, etiqueta] for codigo, etiqueta, _ in opciones_visibles],
-        'correctas': correctas,
-    }
-    request.session.modified = True
-    return request.session['desafio_registro']
-
-
-def _desafio_registro_vigente(request, renovar=False):
-    """Obtiene el desafío de registro de la sesión sin cambiarlo al corregir un formulario."""
-    desafio = request.session.get('desafio_registro')
-    if (
-        renovar
-        or not isinstance(desafio, dict)
-        or not isinstance(desafio.get('opciones'), list)
-        or not isinstance(desafio.get('correctas'), list)
-    ):
-        return _nuevo_desafio_registro(request)
-    return desafio
 
 
 def _mostrar_acceso_cliente(
@@ -153,21 +136,40 @@ def _mostrar_acceso_cliente(
     *,
     formulario_ingreso=None,
     formulario_registro=None,
-    desafio=None,
     modo='ingreso',
 ):
-    """Muestra ingreso y registro en un único panel de cuenta de cliente."""
-    desafio = desafio or _desafio_registro_vigente(request)
+    # Muestra el panel de acceso de clientes
     return render(request, 'cliente_login.html', {
         'formulario_ingreso': formulario_ingreso or AccesoClienteForm(prefix='ingreso'),
-        'formulario_registro': formulario_registro or RegistroClienteForm(
-            opciones_verificacion=desafio['opciones'],
-            prefix='registro',
-        ),
-        'desafio_registro': desafio,
+        'formulario_registro': formulario_registro or RegistroClienteForm(prefix='registro'),
         'modo_auth': modo,
         'next': request.POST.get('next') or request.GET.get('next', ''),
+        'recaptcha_site_key': settings.RECAPTCHA_PUBLIC_KEY,
     })
+
+
+def _validar_recaptcha(request):
+    # Valida reCAPTCHA antes de continuar
+    token = request.POST.get('g-recaptcha-response', '').strip()
+    if not token:
+        return False, 'Confirma que no eres un robot para continuar.'
+    if not settings.RECAPTCHA_PUBLIC_KEY or not settings.RECAPTCHA_PRIVATE_KEY:
+        logger.error('reCAPTCHA no está configurado en el entorno.')
+        return False, 'La verificación de seguridad no está disponible. Inténtalo más tarde.'
+    try:
+        datos = urlencode({
+            'secret': settings.RECAPTCHA_PRIVATE_KEY,
+            'response': token,
+        }).encode('utf-8')
+        peticion = Request('https://www.google.com/recaptcha/api/siteverify', data=datos)
+        with urlopen(peticion, timeout=8) as respuesta:
+            resultado = json.loads(respuesta.read().decode('utf-8'))
+    except (OSError, URLError, ValueError, json.JSONDecodeError):
+        logger.warning('No fue posible validar reCAPTCHA.', exc_info=True)
+        return False, 'No pudimos validar la verificación de seguridad. Inténtalo nuevamente.'
+    if resultado.get('success') is True:
+        return True, ''
+    return False, 'La verificación de seguridad no fue válida. Inténtalo nuevamente.'
 
 
 def _cantidad_valida(valor):
@@ -181,7 +183,7 @@ def _cantidad_valida(valor):
 
 
 def _normalizar_carrito(carrito):
-    """Reconstruye el carrito con datos actuales de la BD, nunca con precios del cliente."""
+    # Vuelve a calcular el carrito con datos de la base de datos
     if not isinstance(carrito, dict) or not carrito:
         raise CarritoInvalido('El carrito está vacío o tiene un formato inválido.')
 
@@ -246,7 +248,7 @@ def _normalizar_carrito(carrito):
 
 
 def _obtener_carrito_vigente(request):
-    """La expiración se aplica en servidor incluso si el JavaScript no se ejecuta."""
+    # Revisa la vigencia del carrito en el servidor
     carrito = request.session.get('carrito', {})
     expiracion = request.session.get('carrito_expira_en')
     duracion_guardada = request.session.get('carrito_duracion_minutos')
@@ -259,7 +261,7 @@ def _obtener_carrito_vigente(request):
         expiracion = None
 
     ahora = int(timezone.now().timestamp())
-    # Los carros creados con la antigua regla de 24 h no conservan su vigencia.
+    # Los carritos antiguos también vencen a los 15 minutos
     if carrito and (
         duracion_guardada != CARRITO_DURACION_MINUTOS
         or expiracion is None
@@ -288,7 +290,7 @@ def _guardar_carrito(request, carrito, reiniciar_expiracion=False):
 
 
 def _items_de_pago(pago):
-    """Devuelve las tallas y cantidades persistidas por el servidor en un intento de pago."""
+    # Lee las prendas y tallas guardadas para este pago
     try:
         items = pago.items
         if not isinstance(items, list) or not items:
@@ -310,7 +312,7 @@ def _items_de_pago(pago):
 
 
 def _liberar_reserva_bloqueada(pago, estado):
-    """Libera una reserva; el PagoPendiente debe venir bloqueado dentro de una transacción."""
+    # Libera el stock reservado dentro de una transacción
     if not pago.reserva_activa:
         return
     try:
@@ -337,7 +339,7 @@ def _liberar_reserva_bloqueada(pago, estado):
 
 
 def _liberar_reservas_expiradas():
-    """Devuelve inventario retenido cuando Mercado Pago ya no debe usar esa preferencia."""
+    # Devuelve el stock de reservas vencidas
     with transaction.atomic():
         pagos = list(
             PagoPendiente.objects.select_for_update().filter(
@@ -351,7 +353,7 @@ def _liberar_reservas_expiradas():
 
 
 def _crear_pago_con_reserva(form, items, subtotal, entrega):
-    """Reserva las tallas por 15 minutos antes de redirigir al PSP."""
+    # Reserva stock por 15 minutos antes de ir a pagar
     _liberar_reservas_expiradas()
     with transaction.atomic():
         ids = [item['variante_id'] for item in items]
@@ -426,7 +428,7 @@ def _extraer_id_pago(request):
 
 
 def _confirmar_pago(payment_id, referencia):
-    """Verifica el pago contra Mercado Pago y crea el pedido de manera atómica."""
+    # Confirma el pago y crea el pedido en una transacción
     if not re.fullmatch(r'\d{1,100}', str(payment_id)):
         raise PagoNoConfirmado('El identificador de pago no es válido.')
     try:
@@ -584,47 +586,51 @@ def registro_cliente(request):
     if request.user.is_authenticated:
         return redirect('mi_cuenta' if _perfil_cliente(request) else 'catalogo')
 
-    desafio = _desafio_registro_vigente(request, renovar=request.method == 'GET')
-    form = RegistroClienteForm(
-        request.POST or None,
-        opciones_verificacion=desafio['opciones'],
-        prefix='registro',
-    )
+    form = RegistroClienteForm(request.POST or None, prefix='registro')
     if request.method == 'POST' and form.is_valid():
-        if set(form.cleaned_data['verificacion_humana']) != set(desafio['correctas']):
-            form.add_error('verificacion_humana', 'La selección no es correcta. Marca todas y solo las opciones solicitadas.')
+        recaptcha_valido, mensaje_recaptcha = _validar_recaptcha(request)
+        if not recaptcha_valido:
+            form.add_error(None, mensaje_recaptcha)
         else:
             usuario_modelo = get_user_model()
-            with transaction.atomic():
-                usuario = usuario_modelo.objects.create_user(
-                    username=_nombre_usuario_cliente(),
-                    email=form.cleaned_data['email'],
-                    password=form.cleaned_data['password1'],
-                )
-                cliente = form.cliente_existente
-                if cliente:
-                    cliente.nombre = form.cleaned_data['nombre']
-                    cliente.email = form.cleaned_data['email']
-                    cliente.telefono = form.cleaned_data['telefono']
-                    cliente.usuario = usuario
-                    cliente.save(update_fields=['nombre', 'email', 'telefono', 'usuario'])
-                else:
-                    cliente = Cliente.objects.create(
-                        usuario=usuario,
-                        rut=form.cleaned_data['rut'],
-                        nombre=form.cleaned_data['nombre'],
+            try:
+                with transaction.atomic():
+                    usuario = usuario_modelo.objects.create_user(
+                        username=_nombre_usuario_cliente(),
                         email=form.cleaned_data['email'],
-                        telefono=form.cleaned_data['telefono'],
-                        direccion='',
+                        password=form.cleaned_data['password1'],
+                        is_active=False,
                     )
-            login(request, usuario)
-            messages.success(request, 'Tu cuenta fue creada. Ya puedes comprar y revisar tus pedidos desde Mi cuenta.')
-            return redirect(_destino_seguro(request, 'catalogo'))
+                    cliente = form.cliente_existente
+                    if cliente:
+                        cliente.nombre = form.cleaned_data['nombre']
+                        cliente.email = form.cleaned_data['email']
+                        cliente.telefono = form.cleaned_data['telefono']
+                        cliente.usuario = usuario
+                        cliente.save(update_fields=['nombre', 'email', 'telefono', 'usuario'])
+                    else:
+                        cliente = Cliente.objects.create(
+                            usuario=usuario,
+                            rut=form.cleaned_data['rut'],
+                            nombre=form.cleaned_data['nombre'],
+                            email=form.cleaned_data['email'],
+                            telefono=form.cleaned_data['telefono'],
+                            direccion='',
+                        )
+                    _enviar_verificacion_correo_cliente(request, cliente)
+            except Exception:
+                logger.exception('No fue posible enviar el correo de verificación de cuenta.')
+                form.add_error(None, 'No pudimos enviar el correo de verificación. Revisa tu dirección e inténtalo nuevamente.')
+            else:
+                return render(request, 'verificar_correo.html', {
+                    'form': ReenviarVerificacionCorreoForm(initial={'email': cliente.email}),
+                    'correo_enviado': True,
+                    'recaptcha_site_key': settings.RECAPTCHA_PUBLIC_KEY,
+                })
 
     return _mostrar_acceso_cliente(
         request,
         formulario_registro=form,
-        desafio=desafio,
         modo='registro',
     )
 
@@ -642,7 +648,9 @@ def iniciar_sesion_cliente(request):
             **filtro,
         ).first()
         usuario = None
-        if cliente and cliente.usuario_id:
+        if cliente and cliente.usuario_id and not cliente.usuario.is_active:
+            form.add_error(None, 'Confirma primero tu correo para activar la cuenta. Puedes solicitar un nuevo enlace más abajo.')
+        elif cliente and cliente.usuario_id:
             usuario = authenticate(
                 request,
                 username=cliente.usuario.username,
@@ -651,7 +659,8 @@ def iniciar_sesion_cliente(request):
         if usuario and not usuario.is_staff:
             login(request, usuario)
             return redirect(_destino_seguro(request, 'catalogo'))
-        form.add_error(None, 'Correo/celular o contraseña incorrectos.')
+        if not (cliente and cliente.usuario_id and not cliente.usuario.is_active):
+            form.add_error(None, 'Correo/celular o contraseña incorrectos.')
     return _mostrar_acceso_cliente(
         request,
         formulario_ingreso=form,
@@ -659,56 +668,132 @@ def iniciar_sesion_cliente(request):
     )
 
 
+def verificar_correo_cliente(request, uidb64, token):
+    # Activa la cuenta al abrir el enlace del correo
+    cliente = None
+    try:
+        usuario_id = force_str(urlsafe_base64_decode(uidb64))
+        cliente = Cliente.objects.select_related('usuario').filter(
+            usuario_id=usuario_id,
+            anonimizado_en__isnull=True,
+            usuario__is_active=False,
+            usuario__is_staff=False,
+        ).first()
+    except (TypeError, ValueError, OverflowError):
+        pass
+
+    if not cliente or not default_token_generator.check_token(cliente.usuario, token):
+        return render(request, 'verificar_correo.html', {
+            'form': ReenviarVerificacionCorreoForm(),
+            'enlace_invalido': True,
+            'recaptcha_site_key': settings.RECAPTCHA_PUBLIC_KEY,
+        }, status=400)
+
+    cliente.usuario.is_active = True
+    cliente.usuario.save(update_fields=['is_active'])
+    messages.success(request, 'Tu correo fue confirmado. Ya puedes iniciar sesión en tu cuenta cliente.')
+    return redirect('iniciar_sesion_cliente')
+
+
+def reenviar_verificacion_correo_cliente(request):
+    # Reenvía el enlace sin revelar si el correo existe
+    if request.user.is_authenticated:
+        return redirect('mi_cuenta' if _perfil_cliente(request) else 'catalogo')
+
+    form = ReenviarVerificacionCorreoForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        recaptcha_valido, mensaje_recaptcha = _validar_recaptcha(request)
+        if not recaptcha_valido:
+            form.add_error(None, mensaje_recaptcha)
+        else:
+            cliente = Cliente.objects.select_related('usuario').filter(
+                email__iexact=form.cleaned_data['email'],
+                anonimizado_en__isnull=True,
+                usuario__is_active=False,
+                usuario__is_staff=False,
+            ).first()
+            if cliente and cliente.usuario_id:
+                try:
+                    _enviar_verificacion_correo_cliente(request, cliente)
+                except Exception:
+                    logger.exception('No fue posible reenviar el correo de verificación de cuenta.')
+                    messages.error(request, 'No pudimos enviar el correo en este momento. Inténtalo nuevamente más tarde.')
+                    return render(request, 'verificar_correo.html', {
+                        'form': form,
+                        'recaptcha_site_key': settings.RECAPTCHA_PUBLIC_KEY,
+                    })
+            return render(request, 'verificar_correo.html', {
+                'form': ReenviarVerificacionCorreoForm(initial={'email': form.cleaned_data['email']}),
+                'correo_enviado': True,
+                'recaptcha_site_key': settings.RECAPTCHA_PUBLIC_KEY,
+            })
+
+    return render(request, 'verificar_correo.html', {
+        'form': form,
+        'recaptcha_site_key': settings.RECAPTCHA_PUBLIC_KEY,
+    })
+
+
 def solicitar_recuperacion_clave_cliente(request):
-    """Envía un enlace temporal de recuperación solo a cuentas de cliente."""
+    # Envía un enlace temporal para recuperar la clave
     if request.user.is_authenticated:
         return redirect('mi_cuenta' if _perfil_cliente(request) else 'catalogo')
 
     form = SolicitudRecuperacionClaveClienteForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
-        cliente = Cliente.objects.select_related('usuario').filter(
-            email__iexact=form.cleaned_data['email'],
-            anonimizado_en__isnull=True,
-            usuario__is_active=True,
-            usuario__is_staff=False,
-        ).first()
-        if cliente and cliente.usuario_id:
-            usuario = cliente.usuario
-            uidb64 = urlsafe_base64_encode(force_bytes(usuario.pk))
-            token = default_token_generator.make_token(usuario)
-            enlace = request.build_absolute_uri(reverse(
-                'restablecer_clave_cliente',
-                kwargs={'uidb64': uidb64, 'token': token},
-            ))
-            try:
-                send_mail(
-                    subject='Restablece tu contraseña de LogisFlow',
-                    message=(
-                        f'Hola {cliente.nombre},\n\n'
-                        'Recibimos una solicitud para restablecer la contraseña de tu cuenta cliente. '
-                        'Usa este enlace temporal para crear una nueva contraseña:\n\n'
-                        f'{enlace}\n\n'
-                        'Si no solicitaste este cambio, puedes ignorar este correo. '
-                        'Tu contraseña actual seguirá protegida.'
-                    ),
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[cliente.email],
-                    fail_silently=False,
-                )
-            except Exception:
-                logger.exception('No fue posible enviar el correo de recuperación de contraseña.')
-                messages.error(request, 'No pudimos enviar el correo en este momento. Inténtalo nuevamente más tarde.')
-                return render(request, 'recuperar_clave.html', {'form': form})
+        recaptcha_valido, mensaje_recaptcha = _validar_recaptcha(request)
+        if not recaptcha_valido:
+            form.add_error(None, mensaje_recaptcha)
+        else:
+            cliente = Cliente.objects.select_related('usuario').filter(
+                email__iexact=form.cleaned_data['email'],
+                anonimizado_en__isnull=True,
+                usuario__is_active=True,
+                usuario__is_staff=False,
+            ).first()
+            if cliente and cliente.usuario_id:
+                usuario = cliente.usuario
+                uidb64 = urlsafe_base64_encode(force_bytes(usuario.pk))
+                token = default_token_generator.make_token(usuario)
+                enlace = request.build_absolute_uri(reverse(
+                    'restablecer_clave_cliente',
+                    kwargs={'uidb64': uidb64, 'token': token},
+                ))
+                try:
+                    send_mail(
+                        subject='Restablece tu contraseña de LogisFlow',
+                        message=(
+                            f'Hola {cliente.nombre},\n\n'
+                            'Recibimos una solicitud para restablecer la contraseña de tu cuenta cliente. '
+                            'Usa este enlace temporal para crear una nueva contraseña:\n\n'
+                            f'{enlace}\n\n'
+                            'Si no solicitaste este cambio, puedes ignorar este correo. '
+                            'Tu contraseña actual seguirá protegida.'
+                        ),
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[cliente.email],
+                        fail_silently=False,
+                    )
+                except Exception:
+                    logger.exception('No fue posible enviar el correo de recuperación de contraseña.')
+                    messages.error(request, 'No pudimos enviar el correo en este momento. Inténtalo nuevamente más tarde.')
+                    return render(request, 'recuperar_clave.html', {
+                        'form': form,
+                        'recaptcha_site_key': settings.RECAPTCHA_PUBLIC_KEY,
+                    })
 
-        # La misma respuesta evita confirmar si una dirección tiene cuenta registrada.
-        messages.success(request, 'Si el correo corresponde a una cuenta cliente, recibirás un enlace temporal para restablecer tu contraseña.')
-        return redirect('iniciar_sesion_cliente')
+            # La respuesta no revela si el correo tiene una cuenta
+            messages.success(request, 'Si el correo corresponde a una cuenta cliente, recibirás un enlace temporal para restablecer tu contraseña.')
+            return redirect('iniciar_sesion_cliente')
 
-    return render(request, 'recuperar_clave.html', {'form': form})
+    return render(request, 'recuperar_clave.html', {
+        'form': form,
+        'recaptcha_site_key': settings.RECAPTCHA_PUBLIC_KEY,
+    })
 
 
 def restablecer_clave_cliente(request, uidb64, token):
-    """Valida el token de Django y permite definir una nueva contraseña de cliente."""
+    # Valida el enlace antes de cambiar la contraseña
     cliente = None
     try:
         usuario_id = force_str(urlsafe_base64_decode(uidb64))
@@ -826,24 +911,50 @@ def descargar_mis_datos(request):
     return respuesta
 
 
-@login_required(login_url='iniciar_sesion_cliente')
 def solicitar_privacidad(request):
+    # Registra consultas de soporte para revisión
     cliente = _perfil_cliente(request)
-    if not cliente:
+    if request.user.is_authenticated and not cliente:
         return HttpResponseForbidden('Esta sesión no corresponde a una cuenta de cliente.')
+    es_invitada = cliente is None
     tipo_solicitado = request.GET.get('tipo', '')
-    tipos_validos = {codigo for codigo, _ in SolicitudPrivacidad.TIPOS}
-    form = SolicitudPrivacidadForm(
+    tipos_disponibles = (
+        [codigo for codigo, _ in SolicitudPrivacidad.TIPOS_SOPORTE]
+        if not es_invitada else [codigo for codigo, _ in SoporteInvitadoForm.base_fields['tipo'].choices]
+    )
+    formulario_clase = SoporteInvitadoForm if es_invitada else SolicitudPrivacidadForm
+    form = formulario_clase(
         request.POST or None,
-        initial={'tipo': tipo_solicitado} if tipo_solicitado in tipos_validos else None,
+        initial={'tipo': tipo_solicitado} if tipo_solicitado in tipos_disponibles else None,
     )
     if request.method == 'POST' and form.is_valid():
-        solicitud = form.save(commit=False)
-        solicitud.cliente = cliente
-        solicitud.save()
-        messages.success(request, 'Recibimos tu solicitud. Podrás ver su estado en Mi cuenta.')
-        return redirect('mi_cuenta')
-    return render(request, 'solicitar_privacidad.html', {'form': form})
+        recaptcha_valido, mensaje_recaptcha = _validar_recaptcha(request)
+        if not recaptcha_valido:
+            form.add_error(None, mensaje_recaptcha)
+        else:
+            cliente_solicitud = cliente
+            if es_invitada:
+                pedido = Pedido.objects.select_related('cliente').filter(
+                    cliente__rut=form.cleaned_data['rut'],
+                    codigo_seguimiento=form.cleaned_data['codigo_seguimiento'],
+                ).first()
+                if not pedido:
+                    form.add_error(None, 'No encontramos una compra con ese RUT y código de seguimiento.')
+                else:
+                    cliente_solicitud = pedido.cliente
+            if cliente_solicitud:
+                SolicitudPrivacidad.objects.create(
+                    cliente=cliente_solicitud,
+                    tipo=form.cleaned_data['tipo'],
+                    detalle=form.cleaned_data['detalle'],
+                )
+                messages.success(request, 'Recibimos tu consulta. La revisaremos por el canal de contacto de tu compra.')
+                return redirect('mi_cuenta' if cliente else 'seguimiento')
+    return render(request, 'solicitar_privacidad.html', {
+        'form': form,
+        'recaptcha_site_key': settings.RECAPTCHA_PUBLIC_KEY,
+        'es_invitada': es_invitada,
+    })
 
 
 def producto_detalle(request, producto_id):
@@ -1148,14 +1259,12 @@ def actualizar_estado_pedido(request):
 def resolver_solicitud_privacidad(request, solicitud_id):
     solicitud = get_object_or_404(SolicitudPrivacidad.objects.select_related('cliente'), id=solicitud_id)
     accion = request.POST.get('accion')
-    if accion == 'anonimizar' and solicitud.tipo == 'SUPRESION' and solicitud.cliente:
-        solicitud.cliente.anonimizar()
-    elif accion != 'resolver':
+    if accion != 'resolver':
         return HttpResponseBadRequest('La acción de privacidad no es válida.')
     solicitud.estado = 'RESUELTA'
     solicitud.resuelto_en = timezone.now()
     solicitud.save(update_fields=['estado', 'resuelto_en'])
-    messages.success(request, 'La solicitud de privacidad fue actualizada.')
+    messages.success(request, 'La consulta de soporte fue marcada como resuelta.')
     return redirect('dashboard')
 
 

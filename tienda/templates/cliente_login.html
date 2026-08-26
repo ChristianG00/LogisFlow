@@ -27,21 +27,13 @@
         .switch-button { border: 0; padding: 0; color: var(--brand); background: transparent; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
         .switch-button:hover { color: var(--brand-dark); }
         .verification-box { border: 1px solid #ead4df; border-radius: 14px; background: #fff8fb; padding: 1rem; }
-        .verification-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
-        .verification-option { display: flex; align-items: center; gap: .45rem; min-height: 48px; padding: .55rem; border: 1px solid #e4d8df; border-radius: 10px; background: #fff; cursor: pointer; font-size: .83rem; }
-        .verification-option:hover { border-color: #b4487a; background: #fff4f8; }
-        .verification-option .form-check-input { flex: 0 0 auto; margin: 0; }
         .privacy-check { border: 1px solid #e6e3e8; border-radius: 12px; background: #faf9fb; }
-        .auth-footer { margin-top: auto; color: #bdb3be; background: var(--ink); }
-        .auth-footer a { color: #f0c6d9; text-decoration: none; }
-        .auth-footer a:hover { color: #fff; }
         @media (max-width: 767px) {
             body { display: block !important; }
             .auth-card { border-radius: 20px; }
             .auth-side { min-height: auto; }
             .auth-forms, .auth-card.is-register .auth-forms { height: auto !important; }
             .auth-panel { padding: 1.75rem 1.35rem; }
-            .verification-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
     </style>
 </head>
@@ -81,6 +73,7 @@
                                 <button type="submit" class="btn btn-primary w-100 fw-bold py-3">Ingresar a mi cuenta <i class="bi bi-arrow-right ms-1"></i></button>
                             </form>
                             <div class="d-flex flex-wrap justify-content-between gap-2 mt-4 small"><a class="brand fw-semibold text-decoration-none" href="{% url 'recuperar_clave_cliente' %}">¿Olvidaste tu contraseña?</a><span class="text-secondary">¿Aún no tienes cuenta? <button class="switch-button" type="button" data-auth-target="registro">Crear cuenta</button>.</span></div>
+                            <p class="text-center small text-secondary mt-3 mb-0">¿No recibiste el correo de verificación? <a class="brand fw-semibold text-decoration-none" href="{% url 'reenviar_verificacion_correo_cliente' %}">Reenviar enlace</a>.</p>
                         </div>
 
                         <div class="auth-panel" id="panel-registro">
@@ -98,7 +91,7 @@
                                     <div class="col-12"><label class="form-label fw-semibold" for="{{ formulario_registro.email.id_for_label }}">Correo electrónico</label>{{ formulario_registro.email }}<small class="text-secondary d-block mt-1">Lo usaremos para tu compra y cuenta; no para publicidad.</small>{% if formulario_registro.email.errors %}<div class="text-danger small mt-1">{{ formulario_registro.email.errors|striptags }}</div>{% endif %}</div>
                                     <div class="col-md-6"><label class="form-label fw-semibold" for="{{ formulario_registro.password1.id_for_label }}">Contraseña</label>{{ formulario_registro.password1 }}{% if formulario_registro.password1.errors %}<div class="text-danger small mt-1">{{ formulario_registro.password1.errors|striptags }}</div>{% endif %}</div>
                                     <div class="col-md-6"><label class="form-label fw-semibold" for="{{ formulario_registro.password2.id_for_label }}">Repite la contraseña</label>{{ formulario_registro.password2 }}{% if formulario_registro.password2.errors %}<div class="text-danger small mt-1">{{ formulario_registro.password2.errors|striptags }}</div>{% endif %}</div>
-                                    <div class="col-12"><div class="verification-box"><label class="form-label fw-semibold"><i class="bi bi-shield-check me-1"></i>Verificación humana</label><p class="small text-secondary mb-3">{{ desafio_registro.instruccion }}.</p><div class="verification-grid">{% for opcion in formulario_registro.verificacion_humana %}<label class="verification-option">{{ opcion.tag }}<span>{{ opcion.choice_label }}</span></label>{% endfor %}</div>{% if formulario_registro.verificacion_humana.errors %}<div class="text-danger small mt-2">{{ formulario_registro.verificacion_humana.errors|striptags }}</div>{% endif %}</div></div>
+                                    <div class="col-12"><div class="verification-box"><label class="form-label fw-semibold"><i class="bi bi-shield-check me-1"></i>Verificación de seguridad</label><p class="small text-secondary mb-3">Completa el reCAPTCHA para proteger la creación de cuentas.</p><div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div></div></div>
                                 </div>
                                 <div class="privacy-check form-check p-3 mt-4">{{ formulario_registro.aceptar_privacidad }}<label class="form-check-label small ms-2" for="{{ formulario_registro.aceptar_privacidad.id_for_label }}">Leí la <a href="{% url 'politica_privacidad' %}" target="_blank" rel="noopener">Política de privacidad</a> y autorizo el uso de mis datos para administrar mi cuenta y compras.</label>{% if formulario_registro.aceptar_privacidad.errors %}<div class="text-danger small mt-1">{{ formulario_registro.aceptar_privacidad.errors|striptags }}</div>{% endif %}</div>
                                 <button class="btn btn-primary w-100 fw-bold py-3 mt-4" type="submit">Crear mi cuenta <i class="bi bi-arrow-right ms-1"></i></button>
@@ -110,7 +103,8 @@
             </div>
         </section>
     </main>
-    <footer class="auth-footer py-4"><div class="container auth-shell d-flex flex-wrap justify-content-between align-items-center gap-2"><span class="small"><strong class="text-white">LOGISFLOW</strong> · Moda femenina, compra y despacho con información clara.</span><div class="d-flex flex-wrap gap-3 small"><a href="{% url 'politicas_despacho' %}">Despacho</a><a href="{% url 'terminos_condiciones' %}">Términos y privacidad</a><a href="{% url 'seguimiento' %}">Seguimiento</a><a href="{% url 'login' %}"><i class="bi bi-shield-lock me-1"></i>Administración</a></div></div></footer>
+    {% include "partials/footer.html" %}
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         (() => {

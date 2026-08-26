@@ -1,9 +1,8 @@
-# Reglas de despacho visibles y centralizadas para el checkout
+# Tarifas y plazos de entrega
 
 TARIFA_METRO_POR_KILOMETRO = 200
 
-# Recorrido habilitado para la entrega personal: Línea 1, desde Universidad de
-# Chile hasta Tobalaba cada tramo/kilómetro siguiente añade otros $200.
+# Entrega en Metro: Universidad de Chile a Tobalaba, desde $200
 TRAMO_METRO = (
     ('Universidad de Chile', 1),
     ('Santa Lucía', 2),
@@ -70,12 +69,12 @@ def datos_estacion_metro(codigo):
 
 
 def estaciones_metro_para_checkout():
-    # Datos serializables para que la interfaz muestre estación y tarifa exactas.
+    # Datos usados por el checkout
     return {codigo: datos.copy() for codigo, datos in ESTACIONES_METRO.items()}
 
 
 def informacion_entrega(tipo_entrega, estacion_metro=None):
-    # Devuelve una copia para que los datos del pedido queden inmutables
+    # Copia los datos de entrega para guardarlos en el pedido
     entrega = OPCIONES_ENTREGA[tipo_entrega].copy()
     if tipo_entrega == 'Metro':
         estacion = datos_estacion_metro(estacion_metro)

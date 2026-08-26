@@ -1,4 +1,5 @@
-# Retencion y anonimizacion de datos personales de la tienda
+# Reglas de conservación y anonimización
+
 from datetime import timedelta
 
 from django.db import transaction
@@ -7,16 +8,14 @@ from django.utils import timezone
 from .models import Cliente, PagoPendiente
 
 
-# Se conservan las compras confirmadas por seis años para respaldo comercial y
-# tributario, los intentos de pago no confirmados se minimizan tras 30 días
+# Las compras confirmadas se conservan seis años; los pagos sin compra, 30 días
 RETENCION_PEDIDOS_DIAS = 6 * 365
 RETENCION_PAGOS_NO_CONFIRMADOS_DIAS = 30
 ESTADOS_PAGO_SIN_COMPRA = ('EXPIRADO', 'CANCELADO', 'SIN_STOCK')
 
 
 def anonimizar_datos_vencidos(ahora=None, aplicar=True):
-
-    # Anonimiza los datos de clientes y pagos pendientes que hayan expirado segun la politica de retencion
+    # Omite las cuentas activas y conserva solo el historial necesario
     ahora = ahora or timezone.now()
     limite_pagos = ahora - timedelta(days=RETENCION_PAGOS_NO_CONFIRMADOS_DIAS)
     limite_pedidos = ahora - timedelta(days=RETENCION_PEDIDOS_DIAS)
@@ -49,8 +48,7 @@ def anonimizar_datos_vencidos(ahora=None, aplicar=True):
     if not aplicar:
         return resultado
 
-    # PostgreSQL no permite SELECT  FOR UPDATE junto con DISTINCT, Primero
-    # obtenemos los IDs unicos y luego bloqueamos una consulta simple por ID
+    # Se bloquean los registros por ID antes de modificarlos
     clientes_ids = list(clientes_vencidos.values_list('id', flat=True))
     with transaction.atomic():
         for pago in pagos_sin_compra.select_for_update().iterator():

@@ -3,7 +3,6 @@ from django.utils import timezone
 
 from .models import Cliente, DetallePedido, PagoPendiente, Pedido, Producto, SolicitudPrivacidad
 
-# Aquí le decimos a Django que muestre estas tablas en el panel web
 admin.site.register(Cliente)
 admin.site.register(Producto)
 admin.site.register(Pedido)

@@ -33,7 +33,7 @@ CATEGORIAS_INFERIORES = {'INFERIOR', 'PANTALONES', 'FALDAS'}
 
 
 def _puntuar_outfit(arriba, abajo, presupuesto, estilo, temporada):
-    # Puntaje explicable: preferencias, armonía, stock y uso del presupuesto
+    # Ordena las combinaciones según las preferencias y el stock
     puntaje = 20
     razones = ['Dentro de tu presupuesto']
 
@@ -100,7 +100,7 @@ def _productos_disponibles(talla, presupuesto):
 
     disponibles = []
     for producto in productos:
-        # La combinación producto+talla es unica, se usa el stock real de esa talla
+        # El stock depende de la talla elegida
         if producto.variantes_recomendadas:
             producto.stock_recomendado = producto.variantes_recomendadas[0].stock_disponible
             producto.talla_recomendada = talla

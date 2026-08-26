@@ -17,7 +17,7 @@
 </head>
 <body>
     <nav class="navbar bg-white border-bottom py-3">
-        <div class="container"><a class="navbar-brand fw-bold text-primary" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a><a href="{% url 'ver_carrito' %}" class="btn btn-outline-secondary rounded-pill">Volver al carrito</a></div>
+        <div class="container"><a class="navbar-brand fw-bold text-primary" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a><div class="d-flex gap-2"><a href="{% url 'solicitar_privacidad' %}" class="btn btn-outline-secondary rounded-pill">Soporte</a><a href="{% url 'ver_carrito' %}" class="btn btn-outline-secondary rounded-pill">Volver al carrito</a></div></div>
     </nav>
     <main class="container py-4 py-lg-5" style="max-width: 960px;">
         <section class="hero p-4 p-lg-5 mb-4">
@@ -50,5 +50,6 @@
 
         <p class="text-center small mb-0"><a class="text-decoration-none" href="{% url 'terminos_condiciones' %}">Ver Términos y condiciones de compra</a></p>
     </main>
+    {% include "partials/footer.html" %}
 </body>
 </html>

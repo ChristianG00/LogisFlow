@@ -12,7 +12,6 @@
         .icon-circle { width:58px; height:58px; display:grid; place-items:center; border-radius:50%; color:#fff; background:linear-gradient(145deg,#7c3f69,#b4487a); font-size:1.45rem; }
         .form-control { min-height:48px; border-radius:11px; border-color:#dcdde6; } .form-control:focus { border-color:#d67da7; box-shadow:0 0 0 .2rem rgba(180,72,122,.13); }
         .btn-primary { --bs-btn-bg:#b4487a; --bs-btn-border-color:#b4487a; --bs-btn-hover-bg:#93365f; --bs-btn-hover-border-color:#93365f; }
-        .footer { color:#bdb3be; background:var(--ink); } .footer a { color:#f0c6d9; text-decoration:none; } .footer a:hover { color:#fff; }
     </style>
 </head>
 <body class="d-flex flex-column">
@@ -33,6 +32,6 @@
             <p class="text-center small text-secondary mt-4 mb-0"><a class="brand fw-semibold text-decoration-none" href="{% url 'iniciar_sesion_cliente' %}"><i class="bi bi-arrow-left me-1"></i>Volver a iniciar sesión</a></p>
         </div></section>
     </main>
-    <footer class="footer py-4"><div class="container shell d-flex flex-wrap justify-content-between gap-2 small"><span><strong class="text-white">LOGISFLOW</strong> · Moda femenina, compra y despacho con información clara.</span><div class="d-flex gap-3"><a href="{% url 'politicas_despacho' %}">Despacho</a><a href="{% url 'terminos_condiciones' %}">Términos y privacidad</a></div></div></footer>
+    {% include "partials/footer.html" %}
 </body>
 </html>

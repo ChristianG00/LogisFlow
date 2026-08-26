@@ -158,3 +158,7 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 
 # El nombre del remitente que vera la clienta cuando le llegue el correo
 DEFAULT_FROM_EMAIL = f"LogisFlow Tienda <{EMAIL_HOST_USER}>"
+
+# Configuración de reCAPTCHA
+RECAPTCHA_PUBLIC_KEY = os.getenv('RECAPTCHA_PUBLIC_KEY')
+RECAPTCHA_PRIVATE_KEY = os.getenv('RECAPTCHA_PRIVATE_KEY')

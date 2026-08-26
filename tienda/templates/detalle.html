@@ -18,11 +18,11 @@
 </head>
 <body class="bg-light">
 
-    <!-- Navegacion-->
+    <!-- Navegación -->
     <nav class="navbar navbar-dark product-nav mb-4 shadow-sm py-3">
         <div class="container">
             <a class="navbar-brand fw-bold" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LogisFlow Tienda</a>
-            <a href="{% url 'ver_carrito' %}" class="btn btn-outline-light"><i class="bi bi-cart3 me-2"></i>Mi Carrito</a>
+            <div class="d-flex gap-2"><a href="{% url 'solicitar_privacidad' %}" class="btn btn-outline-light"><i class="bi bi-chat-heart me-1"></i>Soporte</a><a href="{% url 'ver_carrito' %}" class="btn btn-outline-light"><i class="bi bi-cart3 me-2"></i>Mi Carrito</a></div>
         </div>
     </nav>
 
@@ -32,7 +32,7 @@
         </div>
 
         <div class="row bg-white product-card p-4 p-lg-5">
-            <!-- Foto del producto-->
+            <!-- FOTO DEL PRODUCTO -->
             <div class="col-md-6 text-center">
                 {% if producto.imagen %}
                     <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}" class="product-photo shadow-sm" onerror="this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');">
@@ -46,14 +46,14 @@
                 {% endif %}
             </div>
 
-            <!-- Detalles y formulario -->
+            <!-- DETALLES Y FORMULARIO -->
             <div class="col-md-6 d-flex flex-column justify-content-center mt-4 mt-md-0">
                 <h1 class="fw-bold">{{ producto.nombre }}</h1>
                 <h2 class="price fw-bold mb-4">${{ producto.precio }}</h2>
                 
                 <hr>
 
-                <!-- Formulario de carrito -->
+                <!-- FORMULARIO DE CARRITO (AHORA EXIGE VARIANTE) -->
                 <form action="{% url 'agregar_carrito' producto.id %}" method="post" class="mt-3">
                     {% csrf_token %}
                     
@@ -92,5 +92,6 @@
             </div>
         </div>
     </div>
+    {% include "partials/footer.html" %}
 </body>
 </html>

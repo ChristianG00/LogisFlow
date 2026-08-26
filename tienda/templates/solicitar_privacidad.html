@@ -1,76 +1,9 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solicitud de privacidad · LogisFlow</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <style>
-        :root {
-            --ink: #34233d;
-            --brand: #b4487a
-        }
-
-        body {
-            min-height: 100vh;
-            background: #fcf7fa;
-            color: var(--ink)
-        }
-
-        .card {
-            max-width: 700px;
-            border: 0;
-            border-radius: 22px;
-            box-shadow: 0 12px 34px rgba(75, 36, 64, .1)
-        }
-
-        .form-control,
-        .form-select {
-            border-radius: 11px;
-            min-height: 46px
-        }
-
-        .btn-primary {
-            --bs-btn-bg: #b4487a;
-            --bs-btn-border-color: #b4487a;
-            --bs-btn-hover-bg: #93365f;
-            --bs-btn-hover-border-color: #93365f
-        }
-
-        .text-primary {
-            color: var(--brand) !important
-        }
-    </style>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Ayuda y soporte · LogisFlow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>:root{--ink:#34233d;--brand:#b4487a}body{min-height:100vh;background:#fcf7fa;color:var(--ink)}.card{max-width:700px;border:0;border-radius:22px;box-shadow:0 12px 34px rgba(75,36,64,.1)}.form-control,.form-select{border-radius:11px;min-height:46px}.form-control:focus,.form-select:focus{border-color:#d67da7;box-shadow:0 0 0 .2rem rgba(180,72,122,.13)}.notice{border:1px solid #efd6e2;border-radius:13px;background:#fff7fb}.btn-primary{--bs-btn-bg:#b4487a;--bs-btn-border-color:#b4487a;--bs-btn-hover-bg:#93365f;--bs-btn-hover-border-color:#93365f}.text-primary{color:var(--brand)!important}</style>
 </head>
-
-<body>
-    <nav class="navbar bg-white border-bottom py-3">
-        <div class="container" style="max-width:700px"><a href="{% url 'mi_cuenta' %}"
-                class="text-primary fw-bold text-decoration-none"><i class="bi bi-arrow-left me-2"></i>Mi cuenta</a>
-        </div>
-    </nav>
-    <main class="container py-5">
-        <section class="card mx-auto">
-            <div class="card-body p-4 p-lg-5">
-                <p class="small fw-bold text-primary mb-2">DERECHOS SOBRE TUS DATOS</p>
-                <h1 class="h3 fw-bold">Crear una solicitud</h1>
-                <p class="text-secondary small mb-4">Describe tu solicitud. Para acceder o portar tus datos también
-                    puedes descargar el archivo JSON desde Mi cuenta.</p>
-                <form method="post" novalidate>{% csrf_token %}{% if form.non_field_errors %}<div
-                        class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}<div class="mb-3"><label
-                            class="form-label fw-semibold">Tipo de solicitud</label>{{ form.tipo }}{% if
-                        form.tipo.errors %}<div class="text-danger small mt-1">{{ form.tipo.errors|striptags }}</div>{%
-                        endif %}</div>
-                    <div class="mb-4"><label class="form-label fw-semibold">Detalle (opcional)</label>{{ form.detalle
-                        }}{% if form.detalle.errors %}<div class="text-danger small mt-1">{{
-                            form.detalle.errors|striptags }}</div>{% endif %}</div><button
-                        class="btn btn-primary w-100 py-3 fw-bold" type="submit">Enviar solicitud</button>
-                </form>
-            </div>
-        </section>
-    </main>
-</body>
-
+<body class="d-flex flex-column"><nav class="navbar bg-white border-bottom py-3"><div class="container" style="max-width:700px"><a href="{% if es_invitada %}{% url 'catalogo' %}{% else %}{% url 'mi_cuenta' %}{% endif %}" class="text-primary fw-bold text-decoration-none"><i class="bi bi-arrow-left me-2"></i>{% if es_invitada %}Tienda{% else %}Mi cuenta{% endif %}</a></div></nav><main class="container py-5 flex-grow-1"><section class="card mx-auto"><div class="card-body p-4 p-lg-5"><p class="small fw-bold text-primary mb-2">SOPORTE CENTRALIZADO</p><h1 class="h3 fw-bold">¿En qué te ayudamos?</h1>{% if es_invitada %}<p class="text-secondary small mb-4">¿Compraste como invitada? Verifica tu compra con el RUT y código de seguimiento para que podamos revisar el caso correcto.</p>{% else %}<p class="text-secondary small mb-4">Registra una consulta sobre tu cuenta, pedido o despacho. Quedará asociada a tu cuenta y podrás revisar su estado desde Mi cuenta.</p>{% endif %}<div class="notice p-3 small text-secondary mb-4"><i class="bi bi-shield-lock me-1 text-primary"></i>Este formulario no modifica ni elimina datos automáticamente. Los cambios sensibles se revisan antes de aplicarse. No envíes contraseñas, datos de tarjeta ni códigos de pago.</div><form method="post" novalidate>{% csrf_token %}{% if form.non_field_errors %}<div class="alert alert-danger rounded-3 small">{{ form.non_field_errors|striptags }}</div>{% endif %}{% if es_invitada %}<div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label fw-semibold" for="{{ form.rut.id_for_label }}">RUT de la compra</label>{{ form.rut }}{% if form.rut.errors %}<div class="text-danger small mt-1">{{ form.rut.errors|striptags }}</div>{% endif %}</div><div class="col-md-6"><label class="form-label fw-semibold" for="{{ form.codigo_seguimiento.id_for_label }}">Código de seguimiento</label>{{ form.codigo_seguimiento }}{% if form.codigo_seguimiento.errors %}<div class="text-danger small mt-1">{{ form.codigo_seguimiento.errors|striptags }}</div>{% endif %}</div></div>{% endif %}<div class="mb-3"><label class="form-label fw-semibold" for="{{ form.tipo.id_for_label }}">Tema de tu consulta</label>{{ form.tipo }}{% if form.tipo.errors %}<div class="text-danger small mt-1">{{ form.tipo.errors|striptags }}</div>{% endif %}</div><div class="mb-4"><label class="form-label fw-semibold" for="{{ form.detalle.id_for_label }}">Cuéntanos qué necesitas</label>{{ form.detalle }}{% if form.detalle.errors %}<div class="text-danger small mt-1">{{ form.detalle.errors|striptags }}</div>{% endif %}</div><div class="mb-4"><div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div></div><button class="btn btn-primary w-100 py-3 fw-bold" type="submit">Enviar consulta de soporte <i class="bi bi-send ms-1"></i></button></form></div></section></main>{% include "partials/footer.html" %}<script src="https://www.google.com/recaptcha/api.js" async defer></script></body>
 </html>
