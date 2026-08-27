@@ -14,6 +14,17 @@
         .price { color: #b4487a; }
         .form-select:focus, .form-control:focus { border-color: #df91b4; box-shadow: 0 0 0 .2rem rgba(180,72,122,.12); }
         .btn-primary { --bs-btn-bg: #b4487a; --bs-btn-border-color: #b4487a; --bs-btn-hover-bg: #93365f; --bs-btn-hover-border-color: #93365f; }
+        .product-size-picker { display: flex; flex-wrap: wrap; gap: .65rem; }
+        .product-size-option { position: relative; cursor: pointer; }
+        .product-size-option input { position: absolute; opacity: 0; pointer-events: none; }
+        .product-size-option span { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 72px; min-height: 58px; padding: .45rem .65rem; border: 1px solid #d9dfe8; border-radius: 12px; color: #4e596a; background: #fff; font-weight: 800; transition: .18s ease; }
+        .product-size-option small { color: #7c7380; font-size: .65rem; font-weight: 650; }
+        .product-size-option:hover span { border-color: #d484aa; color: var(--brand); background: #fff7fb; }
+        .product-size-option input:focus-visible + span { outline: 3px solid rgba(180,72,122,.24); outline-offset: 2px; }
+        .product-size-option input:checked + span { border-color: var(--brand); color: #fff; background: var(--brand); box-shadow: 0 5px 12px rgba(180,72,122,.2); }
+        .product-size-option input:checked + span small { color: #fff0f6; }
+        .product-size-unavailable { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 72px; min-height: 58px; padding: .45rem .65rem; border: 1px solid #eceff3; border-radius: 12px; color: #a5adbb; background: #f7f8fa; font-weight: 800; text-decoration: line-through; }
+        .product-size-unavailable small { color: #a5adbb; font-size: .65rem; font-weight: 650; text-decoration: none; }
     </style>
 </head>
 <body class="bg-light">
@@ -22,7 +33,7 @@
     <nav class="navbar navbar-dark product-nav mb-4 shadow-sm py-3">
         <div class="container">
             <a class="navbar-brand fw-bold" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LogisFlow Tienda</a>
-            <div class="d-flex gap-2"><a href="{% url 'solicitar_privacidad' %}" class="btn btn-outline-light"><i class="bi bi-chat-heart me-1"></i>Soporte</a><a href="{% url 'ver_carrito' %}" class="btn btn-outline-light"><i class="bi bi-cart3 me-2"></i>Mi Carrito</a></div>
+            <div class="d-flex gap-2">{% if not user.is_staff %}<a href="{% url 'solicitar_privacidad' %}" class="btn btn-outline-light"><i class="bi bi-chat-heart me-1"></i>Soporte</a>{% endif %}<a href="{% url 'ver_carrito' %}" class="btn btn-outline-light"><i class="bi bi-cart3 me-2"></i>Mi Carrito</a></div>
         </div>
     </nav>
 
@@ -54,29 +65,22 @@
                 <hr>
 
                 <!-- FORMULARIO DE CARRITO (AHORA EXIGE VARIANTE) -->
-                <form action="{% url 'agregar_carrito' producto.id %}" method="post" class="mt-3">
+                {% if producto.stock_total > 0 %}<form action="{% url 'agregar_carrito' producto.id %}" method="post" class="mt-3">
                     {% csrf_token %}
                     
                     <div class="mb-4">
                         <label class="form-label fw-bold">Selecciona tu Talla:</label>
-                        <select name="variante_id" class="form-select form-select-lg" required>
-                            <option value="">-- Elige una opción --</option>
+                        <div class="product-size-picker" aria-label="Tallas disponibles">
                             {% for variante in producto.variantes.all %}
-                                <!-- Bloquea la opción si no hay stock -->
-                                <option value="{{ variante.id }}" {% if variante.stock_disponible <= 0 %}disabled{% endif %}>
-                                    Talla {{ variante.talla }} 
-                                    {% if variante.stock_disponible <= 0 %}
-                                        (Agotado)
-                                    {% elif variante.stock_disponible <= 3 %}
-                                        (¡Últimas {{ variante.stock_disponible }}!)
-                                    {% else %}
-                                        ({{ variante.stock_disponible }} disponibles)
-                                    {% endif %}
-                                </option>
+                                {% if variante.stock_disponible > 0 %}
+                                    <label class="product-size-option"><input type="radio" name="variante_id" value="{{ variante.id }}" required><span>{{ variante.talla }}<small>{% if variante.stock_disponible <= 3 %}Últimas {{ variante.stock_disponible }}{% else %}{{ variante.stock_disponible }} disponibles{% endif %}</small></span></label>
+                                {% else %}
+                                    <span class="product-size-unavailable">{{ variante.talla }}<small>Agotada</small></span>
+                                {% endif %}
                             {% empty %}
-                                <option value="" disabled>Sin stock registrado actualmente</option>
+                                <span class="text-secondary small">Sin tallas registradas actualmente</span>
                             {% endfor %}
-                        </select>
+                        </div>
                     </div>
 
                     <div class="mb-4">
@@ -87,7 +91,7 @@
                     <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold rounded-pill">
                         <i class="bi bi-cart-plus me-2"></i>Agregar al Carrito
                     </button>
-                </form>
+                </form>{% else %}<div class="alert alert-light border mt-3 mb-0"><i class="bi bi-bag-x me-1"></i>Esta prenda no tiene tallas con stock disponible por ahora.</div>{% endif %}
 
             </div>
         </div>

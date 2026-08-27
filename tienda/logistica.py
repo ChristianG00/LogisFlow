@@ -1,29 +1,47 @@
 # Tarifas y plazos de entrega
 
-TARIFA_METRO_POR_KILOMETRO = 200
+# Tarifa adulta Red Movilidad vigente desde el 22 de febrero de 2026
+TARIFAS_METRO = {
+    'BAJA': {
+        'nombre': 'Horario bajo',
+        'costo': 735,
+        'horario': 'Lunes a viernes: 06:00–06:59 y 20:45–23:00',
+    },
+    'VALLE': {
+        'nombre': 'Horario valle',
+        'costo': 815,
+        'horario': 'Lunes a viernes: 09:00–17:59 y 20:00–20:44 · sábados, domingos y festivos',
+    },
+    'PUNTA': {
+        'nombre': 'Horario punta',
+        'costo': 895,
+        'horario': 'Lunes a viernes: 07:00–08:59 y 18:00–19:59',
+    },
+}
+TARIFAS_METRO_CHOICES = [
+    (codigo, f"{datos['nombre']} · ${datos['costo']} · {datos['horario']}")
+    for codigo, datos in TARIFAS_METRO.items()
+]
 
-# Entrega en Metro: Universidad de Chile a Tobalaba, desde $200
+# Entrega en Metro: Universidad de Chile a Tobalaba
 TRAMO_METRO = (
-    ('Universidad de Chile', 1),
-    ('Santa Lucía', 2),
-    ('Universidad Católica', 3),
-    ('Baquedano', 4),
-    ('Salvador', 5),
-    ('Manuel Montt', 6),
-    ('Pedro de Valdivia', 7),
-    ('Los Leones', 8),
-    ('Tobalaba', 9),
+    'Universidad de Chile',
+    'Santa Lucía',
+    'Universidad Católica',
+    'Baquedano',
+    'Salvador',
+    'Manuel Montt',
+    'Pedro de Valdivia',
+    'Los Leones',
+    'Tobalaba',
 )
 
 ESTACIONES_METRO = {
     f'L1_{numero:02d}': {
         'nombre': nombre,
         'linea': 'Línea 1',
-        'kilometros': kilometros,
-        'costo': kilometros * TARIFA_METRO_POR_KILOMETRO,
-        'es_tramo_inicial': kilometros == 1,
     }
-    for numero, (nombre, kilometros) in enumerate(TRAMO_METRO, start=1)
+    for numero, nombre in enumerate(TRAMO_METRO, start=1)
 }
 ESTACIONES_METRO_CHOICES = [
     (
@@ -31,9 +49,9 @@ ESTACIONES_METRO_CHOICES = [
         [
             (
                 f'L1_{numero:02d}',
-                f'{nombre} · {kilometros} km · ${kilometros * TARIFA_METRO_POR_KILOMETRO}',
+                nombre,
             )
-            for numero, (nombre, kilometros) in enumerate(TRAMO_METRO, start=1)
+            for numero, nombre in enumerate(TRAMO_METRO, start=1)
         ],
     ),
 ]
@@ -48,15 +66,17 @@ OPCIONES_ENTREGA = {
     'Metro': {
         'nombre': 'Entrega personal en estación de Metro',
         'costo': 0,
-        'tarifa': '$200 por kilómetro · Universidad de Chile: $200',
+        'tarifa': 'Pasaje Metro adulto según horario: $735 bajo · $815 valle · $895 punta',
         'plazo': '1 a 2 días hábiles tras la confirmación del pago.',
         'seguimiento': 'La vendedora coordina la estación y hora por WhatsApp; el estado también se consulta con tu RUT y código de seguimiento en LogisFlow.',
     },
     'Delivery': {
-        'nombre': 'Despacho a domicilio por empresa de transporte',
-        'costo': 4990,
+        'nombre': 'Despacho a domicilio por Starken',
+        'costo': 0,
+        'por_pagar': True,
+        'tarifa': 'Flete Starken por pagar al recibir el despacho. No se suma a Mercado Pago.',
         'plazo': '2 a 5 días hábiles tras la confirmación del pago.',
-        'seguimiento': 'El despacho se envía mediante courier (por ejemplo, Starken) y recibirás actualizaciones por WhatsApp; también puedes consultar el estado con tu RUT y código de seguimiento en LogisFlow.',
+        'seguimiento': 'Starken calcula el flete según destino, peso y volumen. Lo pagas al recibir el despacho. Recibirás actualizaciones por WhatsApp y podrás consultar el estado con RUT y código.',
     },
 }
 
@@ -68,31 +88,34 @@ def datos_estacion_metro(codigo):
         raise ValueError('La estación de Metro seleccionada no es válida.')
 
 
+def datos_tarifa_metro(codigo):
+    try:
+        return TARIFAS_METRO[codigo].copy()
+    except KeyError:
+        raise ValueError('Selecciona una franja horaria de Metro válida.')
+
+
 def estaciones_metro_para_checkout():
     # Datos usados por el checkout
     return {codigo: datos.copy() for codigo, datos in ESTACIONES_METRO.items()}
 
 
-def informacion_entrega(tipo_entrega, estacion_metro=None):
+def tarifas_metro_para_checkout():
+    return {codigo: datos.copy() for codigo, datos in TARIFAS_METRO.items()}
+
+
+def informacion_entrega(tipo_entrega, estacion_metro=None, tarifa_metro=None):
     # Copia los datos de entrega para guardarlos en el pedido
     entrega = OPCIONES_ENTREGA[tipo_entrega].copy()
     if tipo_entrega == 'Metro':
         estacion = datos_estacion_metro(estacion_metro)
+        tarifa = datos_tarifa_metro(tarifa_metro)
         entrega['nombre'] = f"Entrega personal en {estacion['nombre']} ({estacion['linea']})"
-        entrega['costo'] = estacion['costo']
-        entrega['tarifa'] = (
-            'Universidad de Chile: $200 (primer tramo cobrable).'
-            if estacion['es_tramo_inicial']
-            else f"${estacion['costo']} ({estacion['kilometros']} km × $200 desde Universidad de Chile)."
-        )
-        detalle_tramo = (
-            'Universidad de Chile: primer tramo cobrable.'
-            if estacion['es_tramo_inicial']
-            else f"{estacion['kilometros']} km cobrados desde Universidad de Chile."
-        )
-        entrega['plazo'] = f"1 a 2 días hábiles tras la confirmación del pago · {detalle_tramo}"
+        entrega['costo'] = tarifa['costo']
+        entrega['tarifa'] = f"{tarifa['nombre']}: ${tarifa['costo']} · {tarifa['horario']}"
+        entrega['plazo'] = '1 a 2 días hábiles tras la confirmación del pago.'
         entrega['seguimiento'] = (
-            f"La vendedora coordina estación y hora en {estacion['nombre']} por WhatsApp; "
+            f"La vendedora coordina estación y hora en {estacion['nombre']} por WhatsApp. "
             'el estado también se consulta con tu RUT y código de seguimiento en LogisFlow.'
         )
     return entrega

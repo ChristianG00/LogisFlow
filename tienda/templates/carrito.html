@@ -8,8 +8,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
         :root { --ink: #34233d; --brand: #b4487a; --muted: #7b7085; }
-        body { min-height: 100vh; color: var(--ink); background: radial-gradient(circle at top right, #fbe2ee 0, transparent 32rem), #fcf7fa; }
-        .cart-nav { background: rgba(255,255,255,.88); border-bottom: 1px solid #e6eaf1; backdrop-filter: blur(12px); }
+        body { min-height: 100vh; color: var(--ink); background: #fcf7fa; }
+        .cart-nav { background: #fff; border-bottom: 1px solid #e6eaf1; }
         .cart-shell { max-width: 1140px; }
         .eyebrow { color: var(--brand); font-size: .75rem; font-weight: 800; letter-spacing: .1em; }
         .cart-card, .summary-card { border: 0; border-radius: 22px; box-shadow: 0 14px 42px rgba(28,48,83,.09); }
@@ -28,9 +28,9 @@
         .item-price-label { display: block; color: #8792a5; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
         .remove-button { width: 36px; height: 36px; border: 1px solid #f1d5da; border-radius: 11px; color: #c53e53; background: #fff7f8; }
         .remove-button:hover { background: #ffe8eb; }
-        .summary-card { position: relative; background: var(--ink); color: white; overflow: hidden; }
+        .summary-card { position: relative; background: #fff; color: var(--ink); overflow: hidden; }
         .summary-card::before { content: ''; display: block; height: 5px; background: linear-gradient(90deg, #f4a6c4, #c58ae5); }
-        .summary-card .muted { color: #afbbce; }
+        .summary-card .muted { color: var(--muted); }
         .cart-expiry { border: 1px solid rgba(123,229,194,.32); background: rgba(65,216,171,.09); border-radius: 14px; }
         .pay-button { min-height: 56px; border-radius: 14px; box-shadow: 0 10px 20px rgba(36,107,253,.25); }
         .step-list { display: flex; gap: .5rem; align-items: center; color: #8591a5; font-size: .78rem; font-weight: 700; }
@@ -55,12 +55,9 @@
             <div class="d-flex flex-wrap align-items-center justify-content-end gap-2">
                 {% if user.is_authenticated and not user.is_staff %}
                     <a href="{% url 'mi_cuenta' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-person-heart me-1"></i>Mi cuenta</a>
-                {% elif user.is_staff %}
-                    <a href="{% url 'dashboard' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-shield-lock me-1"></i>Panel</a>
                 {% else %}
                     <a href="{% url 'iniciar_sesion_cliente' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-person me-1"></i>Iniciar sesión</a>
                 {% endif %}
-                <a href="{% url 'solicitar_privacidad' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-chat-heart me-1"></i>Soporte</a>
                 <a href="{% url 'catalogo' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-arrow-left me-1"></i> Seguir viendo</a>
             </div>
         </div>
@@ -98,12 +95,12 @@
             </div>
 
             <div class="col-lg-4">
-                <aside class="summary-card sticky-top" style="top: 20px;"><div class="p-4 p-lg-5"><p class="eyebrow text-white-50 mb-1">RESUMEN</p><h2 class="h4 fw-bold mb-4">Tu compra</h2>
-                    {% if carrito_expira_en_timestamp %}<div class="cart-expiry p-3 mb-4"><div class="d-flex gap-2"><i class="bi bi-bag-check-fill text-success mt-1"></i><small class="muted">Tu carrito se conserva <strong class="text-white">{{ carrito_duracion_minutos }} minutos desde el último cambio</strong>. Puedes seguir mirando con tranquilidad.</small></div></div>{% endif %}
+                <aside class="summary-card sticky-top" style="top: 20px;"><div class="p-4 p-lg-5"><p class="eyebrow mb-1">RESUMEN</p><h2 class="h4 fw-bold mb-4">Tu compra</h2>
+                    {% if carrito_expira_en_timestamp %}<div class="cart-expiry p-3 mb-4"><div class="d-flex gap-2"><i class="bi bi-bag-check-fill text-success mt-1"></i><small class="muted">Tu carrito se conserva <strong class="text-dark">{{ carrito_duracion_minutos }} minutos desde el último cambio</strong>. Puedes seguir mirando con tranquilidad.</small></div></div>{% endif %}
                     <div class="d-flex justify-content-between small muted mb-2"><span>Productos ({{ carrito|length }})</span><span>${{ total }}</span></div>
                     <div class="d-flex justify-content-between align-items-end border-top border-secondary pt-3 mt-3 mb-3"><span class="fs-5">Subtotal</span><strong class="fs-2 text-success">${{ total }}</strong></div>
                     <p class="small muted mb-4"><i class="bi bi-truck me-1"></i> El despacho, plazo y total final se informan antes de pagar.</p>
-                    {% if carrito %}<a href="{% url 'crear_pedido' %}" class="btn btn-primary pay-button w-100 fw-bold fs-5">Continuar con la entrega <i class="bi bi-arrow-right-circle ms-1"></i></a><a href="{% url 'politicas_despacho' %}" class="btn btn-link btn-sm text-white-50 text-decoration-none w-100 mt-3">Ver despacho, plazos y boleta</a>{% else %}<button class="btn btn-secondary pay-button w-100 fw-bold" disabled>Carrito vacío</button>{% endif %}
+                    {% if carrito %}<a href="{% url 'crear_pedido' %}" class="btn btn-primary pay-button w-100 fw-bold fs-5">Continuar con la entrega <i class="bi bi-arrow-right-circle ms-1"></i></a><a href="{% url 'politicas_despacho' %}" class="btn btn-link btn-sm text-secondary text-decoration-none w-100 mt-3">Ver despacho, plazos y boleta</a>{% else %}<button class="btn btn-secondary pay-button w-100 fw-bold" disabled>Carrito vacío</button>{% endif %}
                 </div></aside>
             </div>
         </div>

@@ -12,6 +12,10 @@ def generar_codigo_seguimiento():
     # Código público para consultar un pedido
     return f'LF-{secrets.token_hex(5).upper()}'
 
+
+def generar_codigo_soporte():
+    return f'SUP-{secrets.token_hex(5).upper()}'
+
 class Producto(models.Model):
     CATEGORIAS = [
         ('SUPERIOR', 'Tops y poleras (general)'),
@@ -161,6 +165,7 @@ class Pedido(models.Model):
         editable=False,
     )
     fecha = models.DateTimeField(auto_now_add=True)
+    fecha_entregado = models.DateTimeField(null=True, blank=True, editable=False)
     tipo_entrega = models.CharField(max_length=50)
     estado = models.CharField(max_length=50, choices=ESTADOS, default='Pendiente')
     costo_despacho = models.PositiveIntegerField(default=0)
@@ -278,6 +283,7 @@ class SolicitudPrivacidad(models.Model):
     ESTADOS = [
         ('PENDIENTE', 'Pendiente'),
         ('EN_REVISION', 'En revisión'),
+        ('RESPONDIDA', 'Respondida'),
         ('RESUELTA', 'Resuelta'),
         ('RECHAZADA', 'Rechazada'),
     ]
@@ -289,10 +295,25 @@ class SolicitudPrivacidad(models.Model):
         blank=True,
         related_name='solicitudes_privacidad',
     )
-    tipo = models.CharField(max_length=20, choices=TIPOS)
+    tipo = models.CharField(max_length=20, choices=TIPOS_SOPORTE + TIPOS)
     detalle = models.TextField(max_length=1000, blank=True)
+    codigo_consulta = models.CharField(
+        max_length=14,
+        unique=True,
+        default=generar_codigo_soporte,
+        editable=False,
+    )
+    respuesta = models.TextField(max_length=2000, blank=True)
     estado = models.CharField(max_length=20, choices=ESTADOS, default='PENDIENTE')
     creado_en = models.DateTimeField(auto_now_add=True)
+    respondido_en = models.DateTimeField(null=True, blank=True)
+    respondido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='respuestas_soporte',
+    )
     resuelto_en = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -304,3 +325,29 @@ class SolicitudPrivacidad(models.Model):
 
     def __str__(self):
         return f'{self.get_tipo_display()} · {self.get_estado_display()}'
+
+
+class IncidenteTecnico(models.Model):
+    ESTADOS = [
+        ('ENVIADO', 'Enviado a soporte técnico'),
+        ('PENDIENTE', 'Pendiente de envío'),
+    ]
+
+    asunto = models.CharField(max_length=150)
+    descripcion = models.TextField(max_length=2000)
+    reportado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='incidentes_tecnicos_reportados',
+    )
+    estado = models.CharField(max_length=15, choices=ESTADOS, default='PENDIENTE')
+    correo_enviado_en = models.DateTimeField(null=True, blank=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-creado_en']
+
+    def __str__(self):
+        return f'Incidente #{self.pk} · {self.asunto}'

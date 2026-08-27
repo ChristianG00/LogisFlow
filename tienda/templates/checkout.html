@@ -44,7 +44,7 @@
     <nav class="checkout-nav py-3">
         <div class="container checkout-shell d-flex align-items-center justify-content-between">
             <a class="text-decoration-none fw-bold fs-5 text-primary" href="{% url 'catalogo' %}"><i class="bi bi-box-seam me-2"></i>LOGISFLOW</a>
-            <div class="d-flex gap-2"><a href="{% url 'solicitar_privacidad' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-chat-heart me-1"></i>Soporte</a><a href="{% url 'ver_carrito' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-arrow-left me-1"></i> Volver al carrito</a></div>
+            <div class="d-flex gap-2">{% if not user.is_staff %}<a href="{% url 'solicitar_privacidad' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-chat-heart me-1"></i>Soporte</a>{% endif %}<a href="{% url 'ver_carrito' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-arrow-left me-1"></i> Volver al carrito</a></div>
         </div>
     </nav>
 
@@ -136,11 +136,22 @@
                                 <div class="d-flex gap-3"><i class="bi bi-shop fs-4"></i><div><strong>Retiro en La Granja</strong><br><small>Tras confirmar el pago, coordinaremos la dirección exacta por WhatsApp.</small></div></div>
                             </div>
 
+                            <div id="mensaje_starken" class="secure-note p-3 d-none mb-3">
+                                <div class="d-flex gap-3"><i class="bi bi-truck fs-4"></i><div><strong>Flete Starken por pagar</strong><br><small>El flete no se cobra en Mercado Pago. Starken define el monto según destino, peso y volumen, y se paga al recibir el despacho.</small><a href="https://starken.cl/cotizador" target="_blank" rel="noopener" class="d-inline-block small fw-semibold mt-2">Cotizar flete en Starken <i class="bi bi-box-arrow-up-right ms-1"></i></a></div></div>
+                            </div>
+
                             <div id="contenedor_estacion_metro" class="field-block mb-3 d-none">
                                 <label class="form-label fw-semibold" for="selector_estacion_metro"><i class="bi bi-train-lightrail-front me-2 text-primary"></i>Estación de Metro</label>
                                 {{ form.estacion_metro }}
                                 <small class="text-secondary d-block mt-1">Elige la estación donde la vendedora realizará la entrega personal.</small>
                                 {% if form.estacion_metro.errors %}<div class="error-message"><i class="bi bi-exclamation-circle me-1"></i>{{ form.estacion_metro.errors|striptags }}</div>{% endif %}
+                            </div>
+
+                            <div id="contenedor_tarifa_metro" class="field-block mb-3 d-none">
+                                <label class="form-label fw-semibold" for="selector_tarifa_metro"><i class="bi bi-clock-history me-2 text-primary"></i>Horario de coordinación</label>
+                                {{ form.tarifa_metro }}
+                                <small class="text-secondary d-block mt-1">Se cobra un pasaje adulto de Metro según la franja en que se coordine la entrega.</small>
+                                {% if form.tarifa_metro.errors %}<div class="error-message"><i class="bi bi-exclamation-circle me-1"></i>{{ form.tarifa_metro.errors|striptags }}</div>{% endif %}
                             </div>
 
                             <div id="contenedor_direccion" class="field-block mb-3 d-none">
@@ -191,9 +202,9 @@
                         <div id="resumen-entrega" class="delivery-preview p-3 mb-4" data-subtotal="{{ subtotal_productos }}">
                             <div class="d-flex align-items-start gap-2"><i class="bi bi-truck fs-5 text-info"></i><div class="flex-grow-1"><strong id="resumen-entrega-titulo">Selecciona una modalidad</strong><p id="resumen-entrega-plazo" class="small text-white-50 mb-0">Verás aquí costo, plazo estimado y cómo seguir tu despacho.</p></div></div>
                             <div class="d-flex justify-content-between small mt-3"><span>Productos</span><strong id="resumen-subtotal">${{ subtotal_productos }}</strong></div>
-                            <div class="d-flex justify-content-between small mt-2"><span>Despacho</span><strong id="resumen-costo">—</strong></div>
+                            <div class="d-flex justify-content-between small mt-2"><span id="resumen-etiqueta-costo">Despacho</span><strong id="resumen-costo">—</strong></div>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center border-top border-secondary pt-4 mb-4"><span class="fs-5">Total final</span><strong id="resumen-total" class="fs-2 text-success">{% if entrega_previsualizada %}${{ total }}{% else %}—{% endif %}</strong></div>
+                        <div class="d-flex justify-content-between align-items-center border-top border-secondary pt-4 mb-4"><span id="resumen-etiqueta-total" class="fs-5">Total final</span><strong id="resumen-total" class="fs-2 text-success">{% if entrega_previsualizada %}${{ total }}{% else %}—{% endif %}</strong></div>
                         <div class="d-flex align-items-center gap-2 text-white-50 small"><i class="bi bi-lock-fill text-success"></i> El pago se confirma directamente con Mercado Pago.</div>
                     </div>
                 </aside>
@@ -203,17 +214,22 @@
 
     {{ opciones_entrega|json_script:"opciones-entrega" }}
     {{ estaciones_metro|json_script:"estaciones-metro" }}
+    {{ tarifas_metro|json_script:"tarifas-metro" }}
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const selector = document.getElementById('selector_entrega');
             const divDireccion = document.getElementById('contenedor_direccion');
             const divEstacionMetro = document.getElementById('contenedor_estacion_metro');
+            const divTarifaMetro = document.getElementById('contenedor_tarifa_metro');
             const inputDireccion = document.getElementById('campo_direccion');
             const labelDireccion = document.getElementById('label_direccion');
             const divRetiro = document.getElementById('mensaje_retiro');
+            const divStarken = document.getElementById('mensaje_starken');
             const opcionesEntrega = JSON.parse(document.getElementById('opciones-entrega').textContent);
             const selectorEstacion = document.getElementById('selector_estacion_metro');
             const estacionesMetro = JSON.parse(document.getElementById('estaciones-metro').textContent);
+            const selectorTarifaMetro = document.getElementById('selector_tarifa_metro');
+            const tarifasMetro = JSON.parse(document.getElementById('tarifas-metro').textContent);
             const resumenEntrega = document.getElementById('resumen-entrega');
             const formatoPesos = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
 
@@ -221,7 +237,9 @@
                 const valor = selector.value;
                 divDireccion.classList.toggle('d-none', valor !== 'Delivery');
                 divEstacionMetro.classList.toggle('d-none', valor !== 'Metro');
+                divTarifaMetro.classList.toggle('d-none', valor !== 'Metro');
                 divRetiro.classList.toggle('d-none', valor !== 'Retiro');
+                divStarken.classList.toggle('d-none', valor !== 'Delivery');
                 if (valor === 'Retiro') {
                     inputDireccion.value = 'Retiro en domicilio (La Granja)';
                 } else if (valor === 'Metro') {
@@ -233,16 +251,15 @@
                 }
 
                 let entrega = opcionesEntrega[valor];
-                if (valor === 'Metro' && selectorEstacion.value) {
+                if (valor === 'Metro' && selectorEstacion.value && selectorTarifaMetro.value) {
                     const estacion = estacionesMetro[selectorEstacion.value];
-                    if (estacion) {
+                    const tarifa = tarifasMetro[selectorTarifaMetro.value];
+                    if (estacion && tarifa) {
                         entrega = {
                             ...entrega,
                             nombre: 'Entrega personal en ' + estacion.nombre + ' (' + estacion.linea + ')',
-                            costo: estacion.costo,
-                            plazo: entrega.plazo + ' ' + (estacion.es_tramo_inicial
-                                ? 'Universidad de Chile: primer tramo cobrable de $200.'
-                                : estacion.kilometros + ' km desde Universidad de Chile · $200 por kilómetro.'),
+                            costo: tarifa.costo,
+                            plazo: entrega.plazo + ' Pasaje Metro ' + tarifa.nombre.toLowerCase() + ': ' + formatoPesos.format(tarifa.costo) + '.',
                             seguimiento: 'La vendedora coordinará la estación y hora por WhatsApp.',
                         };
                     } else {
@@ -254,16 +271,30 @@
                 const titulo = document.getElementById('resumen-entrega-titulo');
                 const plazo = document.getElementById('resumen-entrega-plazo');
                 const costo = document.getElementById('resumen-costo');
+                const etiquetaCosto = document.getElementById('resumen-etiqueta-costo');
                 const total = document.getElementById('resumen-total');
+                const etiquetaTotal = document.getElementById('resumen-etiqueta-total');
                 if (entrega) {
                     titulo.textContent = entrega.nombre;
                     plazo.textContent = entrega.plazo + ' ' + entrega.seguimiento;
-                    costo.textContent = formatoPesos.format(entrega.costo);
-                    costo.classList.add('delivery-cost');
-                    total.textContent = formatoPesos.format(Number(resumenEntrega.dataset.subtotal) + entrega.costo);
+                    if (entrega.por_pagar) {
+                        etiquetaCosto.textContent = 'Flete Starken';
+                        etiquetaTotal.textContent = 'Total a pagar hoy';
+                        costo.textContent = 'Por pagar al recibir';
+                        costo.classList.remove('delivery-cost');
+                        total.textContent = formatoPesos.format(Number(resumenEntrega.dataset.subtotal));
+                    } else {
+                        etiquetaCosto.textContent = 'Despacho';
+                        etiquetaTotal.textContent = 'Total final';
+                        costo.textContent = formatoPesos.format(entrega.costo);
+                        costo.classList.add('delivery-cost');
+                        total.textContent = formatoPesos.format(Number(resumenEntrega.dataset.subtotal) + entrega.costo);
+                    }
                 } else {
                     titulo.textContent = 'Selecciona una modalidad';
                     plazo.textContent = 'Verás aquí costo, plazo estimado y cómo seguir tu despacho.';
+                    etiquetaCosto.textContent = 'Despacho';
+                    etiquetaTotal.textContent = 'Total final';
                     costo.textContent = '—';
                     costo.classList.remove('delivery-cost');
                     total.textContent = '—';
@@ -272,6 +303,7 @@
 
             if (selector) { selector.addEventListener('change', actualizarVista); actualizarVista(); }
             if (selectorEstacion) selectorEstacion.addEventListener('change', actualizarVista);
+            if (selectorTarifaMetro) selectorTarifaMetro.addEventListener('change', actualizarVista);
 
             const timer = document.getElementById('cart-timer');
             if (timer) {

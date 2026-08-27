@@ -1,6 +1,7 @@
 import csv
 import json
 import logging
+import os
 import re
 import secrets
 from datetime import timedelta
@@ -31,9 +32,12 @@ from django.views.decorators.http import require_POST
 from .forms import (
     AccesoClienteForm,
     CheckoutForm,
+    ConsultaRespuestaSoporteForm,
     DireccionClienteForm,
+    IncidenteTecnicoForm,
     ProductoForm,
     ReenviarVerificacionCorreoForm,
+    RespuestaSoporteForm,
     RestablecerClaveClienteForm,
     RegistroClienteForm,
     SoporteInvitadoForm,
@@ -46,9 +50,10 @@ from .logistica import (
     OPCIONES_ENTREGA,
     ESTACIONES_METRO,
     estaciones_metro_para_checkout,
+    tarifas_metro_para_checkout,
     informacion_entrega,
 )
-from .models import Cliente, DetallePedido, PagoPendiente, Pedido, Producto, SolicitudPrivacidad, VarianteProducto
+from .models import Cliente, DetallePedido, IncidenteTecnico, PagoPendiente, Pedido, Producto, SolicitudPrivacidad, VarianteProducto
 from .privacidad import anonimizar_datos_vencidos
 
 
@@ -56,6 +61,7 @@ logger = logging.getLogger(__name__)
 MAX_CANTIDAD_POR_LINEA = 1000
 CARRITO_DURACION_MINUTOS = 15
 RESERVA_DURACION_MINUTOS = 15
+SLA_DIAS_HABILES = {'Metro': 2, 'Delivery': 5}
 
 # Agrupa las categorías antiguas sin repetirlas en la tienda
 CATEGORIAS_CATALOGO = (
@@ -78,6 +84,18 @@ class PagoNoConfirmado(ValueError):
     pass
 
 
+def _destinatarios_incidente_tecnico():
+    correos_configurados = os.getenv('TECHNICAL_SUPPORT_EMAILS', '')
+    destinatarios = [
+        correo.strip().lower()
+        for correo in correos_configurados.split(',')
+        if '@' in correo.strip()
+    ]
+    if not destinatarios and settings.EMAIL_HOST_USER:
+        destinatarios.append(settings.EMAIL_HOST_USER)
+    return list(dict.fromkeys(destinatarios))
+
+
 def _perfil_cliente(request):
     if not request.user.is_authenticated:
         return None
@@ -96,6 +114,56 @@ def _destino_seguro(request, predeterminado):
     ):
         return destino
     return predeterminado
+
+
+def _sumar_dias_habiles(fecha_inicial, dias_habiles):
+    fecha = fecha_inicial
+    dias_restantes = dias_habiles
+    while dias_restantes:
+        fecha += timedelta(days=1)
+        if fecha.weekday() < 5:
+            dias_restantes -= 1
+    return fecha
+
+
+def _preparar_indicadores_sla(pedidos):
+    hoy = timezone.localdate()
+
+    for pedido in pedidos:
+        dias_habiles = SLA_DIAS_HABILES.get(pedido.tipo_entrega)
+        pedido.sla_aplicable = bool(dias_habiles)
+        pedido.sla_limite = None
+        pedido.sla_etiqueta = 'Coordinación manual'
+        pedido.sla_clase = 'secondary'
+
+        if not dias_habiles:
+            continue
+
+        fecha_confirmacion = timezone.localtime(pedido.fecha).date()
+        pedido.sla_limite = _sumar_dias_habiles(fecha_confirmacion, dias_habiles)
+
+        if pedido.estado == 'Entregado':
+            if not pedido.fecha_entregado:
+                pedido.sla_etiqueta = 'Sin registro histórico'
+                continue
+            fecha_entrega = timezone.localtime(pedido.fecha_entregado).date()
+            if fecha_entrega <= pedido.sla_limite:
+                pedido.sla_etiqueta = 'Cumplido'
+                pedido.sla_clase = 'success'
+            else:
+                pedido.sla_etiqueta = 'Fuera de plazo'
+                pedido.sla_clase = 'danger'
+            continue
+
+        if pedido.sla_limite < hoy:
+            pedido.sla_etiqueta = 'Plazo vencido'
+            pedido.sla_clase = 'danger'
+        elif pedido.sla_limite == hoy:
+            pedido.sla_etiqueta = 'Vence hoy'
+            pedido.sla_clase = 'warning'
+        else:
+            pedido.sla_etiqueta = 'En plazo'
+            pedido.sla_clase = 'success'
 
 
 def _nombre_usuario_cliente():
@@ -450,11 +518,13 @@ def _confirmar_pago(payment_id, referencia):
         raise PagoNoConfirmado('Mercado Pago informó un monto inválido.')
 
     with transaction.atomic():
-        pago = PagoPendiente.objects.select_for_update().select_related('pedido').get(referencia=referencia)
+        # Bloquea solo el pago pendiente; pedido es una relación opcional y PostgreSQL
+        # no permite bloquearla junto con un LEFT OUTER JOIN
+        pago = PagoPendiente.objects.select_for_update().get(referencia=referencia)
         if pago.pedido_id:
             if pago.mercadopago_payment_id != str(payment_id):
                 raise PagoNoConfirmado('El pago no corresponde a esta compra.')
-            return pago.pedido
+            return Pedido.objects.get(id=pago.pedido_id)
         if pago.estado in {'SIN_STOCK', 'EXPIRADO', 'CANCELADO'}:
             return None
         if pago.mercadopago_payment_id and pago.mercadopago_payment_id != str(payment_id):
@@ -927,6 +997,23 @@ def solicitar_privacidad(request):
         request.POST or None,
         initial={'tipo': tipo_solicitado} if tipo_solicitado in tipos_disponibles else None,
     )
+    modo_consulta = request.GET.get('modo') == 'consultar'
+    datos_consulta = request.GET if modo_consulta and (
+        'consulta-rut' in request.GET or 'consulta-codigo_consulta' in request.GET
+    ) else None
+    consulta_form = ConsultaRespuestaSoporteForm(
+        datos_consulta,
+        prefix='consulta',
+    )
+    consulta_resultado = None
+    if datos_consulta and consulta_form.is_valid():
+        consulta_resultado = SolicitudPrivacidad.objects.filter(
+            cliente__rut=consulta_form.cleaned_data['rut'],
+            codigo_consulta=consulta_form.cleaned_data['codigo_consulta'],
+        ).first()
+        if not consulta_resultado:
+            consulta_form.add_error(None, 'No encontramos una consulta con esos datos. Revisa el RUT y el código.')
+
     if request.method == 'POST' and form.is_valid():
         recaptcha_valido, mensaje_recaptcha = _validar_recaptcha(request)
         if not recaptcha_valido:
@@ -943,15 +1030,24 @@ def solicitar_privacidad(request):
                 else:
                     cliente_solicitud = pedido.cliente
             if cliente_solicitud:
-                SolicitudPrivacidad.objects.create(
+                solicitud = SolicitudPrivacidad.objects.create(
                     cliente=cliente_solicitud,
                     tipo=form.cleaned_data['tipo'],
                     detalle=form.cleaned_data['detalle'],
                 )
-                messages.success(request, 'Recibimos tu consulta. La revisaremos por el canal de contacto de tu compra.')
-                return redirect('mi_cuenta' if cliente else 'seguimiento')
+                if es_invitada:
+                    messages.success(
+                        request,
+                        f'Recibimos tu consulta. Guarda este código para revisar la respuesta: {solicitud.codigo_consulta}',
+                    )
+                    return redirect(f'{reverse("solicitar_privacidad")}?modo=consultar')
+                messages.success(request, 'Recibimos tu consulta. Podrás ver la respuesta desde Mi cuenta.')
+                return redirect('mi_cuenta')
     return render(request, 'solicitar_privacidad.html', {
         'form': form,
+        'consulta_form': consulta_form,
+        'consulta_resultado': consulta_resultado,
+        'modo_consulta': modo_consulta,
         'recaptcha_site_key': settings.RECAPTCHA_PUBLIC_KEY,
         'es_invitada': es_invitada,
     })
@@ -1099,11 +1195,12 @@ def crear_pedido(request):
             form.fields[campo].widget.attrs['readonly'] = 'readonly'
     tipo_entrega = request.POST.get('tipo_entrega') if request.method == 'POST' else None
     estacion_metro = request.POST.get('estacion_metro') if request.method == 'POST' else None
+    tarifa_metro = request.POST.get('tarifa_metro') if request.method == 'POST' else None
     try:
         entrega_previsualizada = (
-            informacion_entrega(tipo_entrega, estacion_metro)
+            informacion_entrega(tipo_entrega, estacion_metro, tarifa_metro)
             if tipo_entrega in OPCIONES_ENTREGA
-            and (tipo_entrega != 'Metro' or estacion_metro in ESTACIONES_METRO)
+            and (tipo_entrega != 'Metro' or (estacion_metro in ESTACIONES_METRO and tarifa_metro))
             else None
         )
     except ValueError:
@@ -1126,6 +1223,7 @@ def crear_pedido(request):
         entrega = informacion_entrega(
             form.cleaned_data['tipo_entrega'],
             form.cleaned_data['estacion_metro'],
+            form.cleaned_data['tarifa_metro'],
         )
         try:
             pago = _crear_pago_con_reserva(form, items, total, entrega)
@@ -1179,6 +1277,7 @@ def crear_pedido(request):
         'entrega_previsualizada': entrega_previsualizada,
         'opciones_entrega': OPCIONES_ENTREGA,
         'estaciones_metro': estaciones_metro_para_checkout(),
+        'tarifas_metro': tarifas_metro_para_checkout(),
         'carrito_expira_en_timestamp': expiracion or request.session.get('carrito_expira_en'),
         'carrito_duracion_minutos': CARRITO_DURACION_MINUTOS,
     })
@@ -1243,6 +1342,28 @@ def politica_privacidad(request):
     return render(request, 'politica_privacidad.html')
 
 
+def iniciar_sesion_administracion(request):
+    # El acceso administrativo admite únicamente cuentas marcadas como staff
+    if request.user.is_authenticated:
+        if request.user.is_staff:
+            return redirect(_destino_seguro(request, reverse('dashboard')))
+        return render(request, '404.html', status=404)
+
+    error = None
+    if request.method == 'POST':
+        usuario = authenticate(
+            request,
+            username=request.POST.get('username', '').strip(),
+            password=request.POST.get('password', ''),
+        )
+        if usuario and usuario.is_staff:
+            login(request, usuario)
+            return redirect(_destino_seguro(request, reverse('dashboard')))
+        error = 'Usuario o contraseña incorrectos.'
+
+    return render(request, 'login.html', {'error': error})
+
+
 @staff_member_required(login_url='login')
 @require_POST
 def actualizar_estado_pedido(request):
@@ -1250,40 +1371,128 @@ def actualizar_estado_pedido(request):
     nuevo_estado = request.POST.get('estado')
     if pedido.estado != 'Entregado' and nuevo_estado in dict(Pedido.ESTADOS) and nuevo_estado != 'Pendiente':
         pedido.estado = nuevo_estado
-        pedido.save(update_fields=['estado'])
+        campos_actualizados = ['estado']
+        if nuevo_estado == 'Entregado':
+            pedido.fecha_entregado = timezone.now()
+            campos_actualizados.append('fecha_entregado')
+        pedido.save(update_fields=campos_actualizados)
     return redirect('dashboard')
 
 
 @staff_member_required(login_url='login')
 @require_POST
-def resolver_solicitud_privacidad(request, solicitud_id):
+def responder_solicitud_soporte(request, solicitud_id):
     solicitud = get_object_or_404(SolicitudPrivacidad.objects.select_related('cliente'), id=solicitud_id)
-    accion = request.POST.get('accion')
-    if accion != 'resolver':
-        return HttpResponseBadRequest('La acción de privacidad no es válida.')
-    solicitud.estado = 'RESUELTA'
-    solicitud.resuelto_en = timezone.now()
-    solicitud.save(update_fields=['estado', 'resuelto_en'])
-    messages.success(request, 'La consulta de soporte fue marcada como resuelta.')
+    form = RespuestaSoporteForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, 'No se envió la respuesta. Escribe al menos 10 caracteres para la clienta.')
+        return redirect('dashboard')
+
+    solicitud.respuesta = form.cleaned_data['respuesta']
+    solicitud.estado = 'RESPONDIDA'
+    solicitud.respondido_en = timezone.now()
+    solicitud.respondido_por = request.user
+    solicitud.save(update_fields=['respuesta', 'estado', 'respondido_en', 'respondido_por'])
+
+    correo_cliente = (solicitud.cliente.email or '').strip() if solicitud.cliente else ''
+    if correo_cliente:
+        mensaje = (
+            'Hola,\n\n'
+            'Respondimos tu consulta de soporte en LogisFlow.\n\n'
+            f'Respuesta:\n{solicitud.respuesta}\n\n'
+            f'Código de consulta: {solicitud.codigo_consulta}\n'
+            'También puedes revisar esta respuesta desde Mi cuenta o, si compraste como invitada, '
+            'en Ayuda y soporte usando tu RUT y código de consulta.\n'
+        )
+        try:
+            send_mail(
+                subject=f'[LogisFlow] Respuesta a tu consulta {solicitud.codigo_consulta}',
+                message=mensaje,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[correo_cliente],
+                fail_silently=False,
+            )
+        except Exception:
+            logger.exception('No fue posible enviar la respuesta de soporte #%s.', solicitud.pk)
+            messages.warning(
+                request,
+                'La respuesta quedó registrada, pero no se pudo enviar el correo. La clienta podrá verla con su código de consulta.',
+            )
+        else:
+            messages.success(request, 'Respuesta enviada. La clienta fue notificada por correo y puede revisarla en la tienda.')
+    else:
+        messages.success(request, 'Respuesta registrada. La clienta puede revisarla con su código de consulta.')
+    return redirect('dashboard')
+
+
+@staff_member_required(login_url='login')
+@require_POST
+def reportar_incidente_tecnico(request):
+    form = IncidenteTecnicoForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, 'No se envió el incidente. Revisa el asunto y describe el problema con más detalle.')
+        return redirect('dashboard')
+
+    incidente = IncidenteTecnico.objects.create(
+        asunto=form.cleaned_data['asunto'],
+        descripcion=form.cleaned_data['descripcion'],
+        reportado_por=request.user,
+    )
+    destinatarios = _destinatarios_incidente_tecnico()
+    if not destinatarios:
+        messages.warning(
+            request,
+            f'El incidente #{incidente.pk} quedó registrado, pero no hay correos técnicos configurados para enviarlo.',
+        )
+        return redirect('dashboard')
+
+    mensaje = (
+        f'Ticket de incidente técnico #{incidente.pk}\n\n'
+        f'Asunto: {incidente.asunto}\n'
+        f'Reportado por: {request.user.get_username()}\n'
+        f'Fecha: {timezone.localtime(incidente.creado_en).strftime("%d/%m/%Y %H:%M")}\n\n'
+        f'Descripción:\n{incidente.descripcion}\n'
+    )
+    try:
+        send_mail(
+            subject=f'[LogisFlow] Incidente técnico #{incidente.pk}: {incidente.asunto}',
+            message=mensaje,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=destinatarios,
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception('No fue posible enviar el incidente técnico #%s.', incidente.pk)
+        messages.warning(
+            request,
+            f'El incidente #{incidente.pk} quedó registrado, pero el correo no pudo enviarse. Intenta nuevamente o contáctanos por el canal acordado.',
+        )
+    else:
+        incidente.estado = 'ENVIADO'
+        incidente.correo_enviado_en = timezone.now()
+        incidente.save(update_fields=['estado', 'correo_enviado_en'])
+        messages.success(request, f'Incidente #{incidente.pk} enviado al equipo técnico.')
     return redirect('dashboard')
 
 
 @staff_member_required(login_url='login')
 def dashboard(request):
-    pedidos = Pedido.objects.exclude(estado='Pendiente').select_related('cliente').order_by('-fecha')
+    pedidos = list(Pedido.objects.exclude(estado='Pendiente').select_related('cliente').order_by('-fecha'))
+    _preparar_indicadores_sla(pedidos)
     abandonados = PagoPendiente.objects.filter(estado='PENDIENTE').order_by('-creado_en')
     detalles = DetallePedido.objects.filter(pedido__in=pedidos)
     ingresos_totales = (
         sum(detalle.precio_unitario * detalle.cantidad for detalle in detalles)
         + sum(pedido.costo_despacho for pedido in pedidos)
     )
-    pedidos_pagados = pedidos.count()
+    pedidos_pagados = len(pedidos)
     context = {
         'pedidos': pedidos, 'abandonados': abandonados, 'productos': Producto.objects.all().order_by('nombre'),
         'estados': Pedido.ESTADOS, 'total_pedidos': pedidos_pagados, 'ingresos_totales': ingresos_totales,
-        'stock_critico': VarianteProducto.objects.filter(stock__lte=F('stock_reservado') + 3).count(), 'pedidos_pendientes': abandonados.count(),
+        'stock_critico': VarianteProducto.objects.filter(stock__lte=F('stock_reservado') + 3).count(), 'pagos_sin_confirmar': abandonados.count(),
         'ticket_promedio': int(ingresos_totales / pedidos_pagados) if pedidos_pagados else 0,
         'clientes_totales': Cliente.objects.count(),
+        'form_incidente_tecnico': IncidenteTecnicoForm(),
         'solicitudes_privacidad': SolicitudPrivacidad.objects.select_related('cliente').filter(
             estado__in=['PENDIENTE', 'EN_REVISION'],
         ),
@@ -1297,10 +1506,37 @@ def guardar_producto(request):
     producto_id = request.POST.get('id')
     producto = get_object_or_404(Producto, id=producto_id) if producto_id else None
     form = ProductoForm(request.POST, request.FILES, instance=producto)
-    if form.is_valid():
-        form.save()
-    else:
+    if not form.is_valid():
         messages.error(request, 'No se guardó el producto: corrige los datos ingresados.')
+        return redirect('dashboard')
+
+    tallas_iniciales = []
+    if not producto:
+        tallas_seleccionadas = request.POST.getlist('tallas')
+        tallas_validas = {codigo for codigo, _ in VarianteProducto.TALLAS_CHOICES}
+        if len(tallas_seleccionadas) != len(set(tallas_seleccionadas)) or any(
+            talla not in tallas_validas for talla in tallas_seleccionadas
+        ):
+            messages.error(request, 'No se guardó el producto: las tallas seleccionadas no son válidas.')
+            return redirect('dashboard')
+        try:
+            for talla in tallas_seleccionadas:
+                stock = int(request.POST.get(f'stock_{talla}', ''))
+                if stock < 0 or stock > 100000:
+                    raise ValueError
+                tallas_iniciales.append((talla, stock))
+        except (TypeError, ValueError):
+            messages.error(request, 'No se guardó el producto: revisa el stock inicial de cada talla seleccionada.')
+            return redirect('dashboard')
+
+    with transaction.atomic():
+        producto_guardado = form.save()
+        for talla, stock in tallas_iniciales:
+            VarianteProducto.objects.create(producto=producto_guardado, talla=talla, stock=stock)
+    if tallas_iniciales:
+        messages.success(request, 'Producto y tallas iniciales guardados correctamente.')
+    else:
+        messages.success(request, 'Producto guardado correctamente.')
     return redirect('dashboard')
 
 
@@ -1340,14 +1576,28 @@ def exportar_excel(request):
     response['Content-Disposition'] = 'attachment; filename="Reporte_Ventas.csv"'
     response.write(u'\ufeff'.encode('utf8'))
     writer = csv.writer(response, delimiter=';')
-    writer.writerow(['N° Ticket', 'Código seguimiento', 'Fecha', 'Cliente', 'RUT', 'Estado', 'Modo Entrega', 'Total Pagado ($)'])
-    for pedido in Pedido.objects.select_related('cliente').all().order_by('-fecha'):
+    writer.writerow([
+        'N° Ticket', 'Código seguimiento', 'Fecha', 'Cliente', 'RUT', 'Estado',
+        'Modo Entrega', 'Total pagado en Mercado Pago ($)', 'Flete externo', 'Límite SLA', 'Fecha de entrega', 'Resultado SLA',
+    ])
+    pedidos = list(Pedido.objects.select_related('cliente').all().order_by('-fecha'))
+    _preparar_indicadores_sla(pedidos)
+    for pedido in pedidos:
         total = (
             sum(detalle.precio_unitario * detalle.cantidad for detalle in DetallePedido.objects.filter(pedido=pedido))
             + pedido.costo_despacho
         )
-        writer.writerow([pedido.id, pedido.codigo_seguimiento, pedido.fecha.strftime('%d/%m/%Y %H:%M'), pedido.cliente.nombre,
-                         pedido.cliente.rut, pedido.estado, pedido.get_tipo_entrega_display(), total])
+        writer.writerow([
+            pedido.id, pedido.codigo_seguimiento, pedido.fecha.strftime('%d/%m/%Y %H:%M'), pedido.cliente.nombre,
+            pedido.cliente.rut, pedido.estado, pedido.get_tipo_entrega_display(), total,
+            (
+                'Por pagar a Starken' if pedido.tipo_entrega == 'Delivery' and not pedido.costo_despacho
+                else 'Incluido en Mercado Pago' if pedido.costo_despacho else 'No aplica'
+            ),
+            pedido.sla_limite or 'No aplica',
+            pedido.fecha_entregado.strftime('%d/%m/%Y %H:%M') if pedido.fecha_entregado else 'Sin registro',
+            pedido.sla_etiqueta,
+        ])
     return response
 
 

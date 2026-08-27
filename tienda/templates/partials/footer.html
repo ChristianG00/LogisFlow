@@ -1,25 +1,26 @@
-<footer class="py-4 mt-5" style="background:#34233d;color:#d9e1ee">
+<style>
+    html { min-height: 100%; }
+    body { min-height: 100vh; display: flex; flex-direction: column; }
+    body > main { flex: 1 0 auto; }
+    .site-footer { margin-top: auto; flex-shrink: 0; }
+</style>
+<footer class="site-footer py-4" style="background:#34233d;color:#d9e1ee">
     <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2" style="max-width:1180px">
         <div>
-            <strong>LOGISFLOW</strong><span class="small ms-2">Moda femenina, compra y despacho con información clara</span>
+            <a href="{% url 'catalogo' %}" class="text-decoration-none" style="color:#fff"><strong>LOGISFLOW</strong></a><span class="small ms-2">Moda femenina, compra y despacho con información clara</span>
         </div>
         <div class="d-flex flex-wrap gap-3 small">
             {% if footer_admin %}
                 <a href="{% url 'catalogo' %}" class="text-decoration-none" style="color:#aebbd0">Tienda pública</a>
-                <a href="{% url 'logout' %}" class="text-decoration-none" style="color:#aebbd0">Cerrar sesión</a>
+                <form action="{% url 'logout' %}" method="post" class="d-inline">{% csrf_token %}<button type="submit" class="p-0 border-0 bg-transparent text-decoration-none" style="color:#aebbd0">Cerrar sesión</button></form>
             {% else %}
                 {% if user.is_authenticated and not user.is_staff %}
                     <a href="{% url 'mi_cuenta' %}" class="text-decoration-none" style="color:#aebbd0">Mi cuenta</a>
                 {% endif %}
-                <a href="{% url 'solicitar_privacidad' %}" class="text-decoration-none" style="color:#aebbd0">Soporte</a>
+                {% if not user.is_staff %}<a href="{% url 'solicitar_privacidad' %}" class="text-decoration-none" style="color:#aebbd0">Soporte</a>{% endif %}
                 <a href="{% url 'politicas_despacho' %}" class="text-decoration-none" style="color:#aebbd0">Despacho</a>
                 <a href="{% url 'terminos_condiciones' %}" class="text-decoration-none" style="color:#aebbd0">Términos y privacidad</a>
                 <a href="{% url 'seguimiento' %}" class="text-decoration-none" style="color:#aebbd0">Seguimiento</a>
-                {% if mostrar_administracion %}
-                    {% if not user.is_authenticated or user.is_staff %}
-                        <a href="{% url 'login' %}" class="text-decoration-none" style="color:#aebbd0">Administración</a>
-                    {% endif %}
-                {% endif %}
             {% endif %}
         </div>
     </div>

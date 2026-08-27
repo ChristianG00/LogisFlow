@@ -36,6 +36,7 @@
         .order-items { color: #5f5566; border-top: 1px solid #f2edf0; font-size: .85rem; }
         .privacy-item + .privacy-item { border-top: 1px solid #f0e9ed; }
         .privacy-state { color: #8f315f; background: #fbe6ef; border-radius: 999px; padding: .28rem .52rem; font-size: .68rem; font-weight: 800; }
+        .support-answer { color: #456656; background: #f3fbf6; border: 1px solid #d8eadf; border-radius: 11px; }
         .empty-state { padding: 2.75rem 1.5rem; text-align: center; color: var(--muted); }
         .empty-icon { width: 62px; height: 62px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; border-radius: 18px; color: var(--brand); background: #fbe6ef; font-size: 1.75rem; }
         .btn-primary { --bs-btn-bg: #b4487a; --bs-btn-border-color: #b4487a; --bs-btn-hover-bg: #93365f; --bs-btn-hover-border-color: #93365f; --bs-btn-active-bg: #7a294e; --bs-btn-active-border-color: #7a294e; }
@@ -87,7 +88,7 @@
                     <div class="p-3 p-md-4">
                         {% for pedido in pedidos %}
                             <article class="order-card p-3 p-lg-4">
-                                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3"><div><span class="tracking-code">{{ pedido.codigo_seguimiento }}</span><h3 class="h6 fw-bold mt-2 mb-1">Pedido del {{ pedido.fecha|date:"d/m/Y" }}</h3><p class="order-meta mb-0"><i class="bi bi-truck me-1"></i>{{ pedido.get_tipo_entrega_display }} · Despacho: {% if pedido.costo_despacho %}${{ pedido.costo_despacho }}{% else %}sin cargo{% endif %}</p></div><span class="status"><i class="bi bi-circle-fill" style="font-size:.4rem"></i>{{ pedido.estado }}</span></div>
+                                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3"><div><span class="tracking-code">{{ pedido.codigo_seguimiento }}</span><h3 class="h6 fw-bold mt-2 mb-1">Pedido del {{ pedido.fecha|date:"d/m/Y" }}</h3><p class="order-meta mb-0"><i class="bi bi-truck me-1"></i>{{ pedido.get_tipo_entrega_display }} · Despacho: {% if pedido.tipo_entrega == 'Delivery' and not pedido.costo_despacho %}flete Starken por pagar{% elif pedido.costo_despacho %}${{ pedido.costo_despacho }}{% else %}sin cargo{% endif %}</p></div><span class="status"><i class="bi bi-circle-fill" style="font-size:.4rem"></i>{{ pedido.estado }}</span></div>
                                 <div class="order-items mt-3 pt-3">{% for detalle in pedido.detallepedido_set.all %}{% if detalle.variante_id %}{{ detalle.variante.producto.nombre }} · talla {{ detalle.variante.talla }} · {{ detalle.cantidad }} un.{% if not forloop.last %}<br>{% endif %}{% endif %}{% endfor %}</div>
                                 <p class="order-meta mb-0 mt-3"><i class="bi bi-calendar2-check me-1"></i>{{ pedido.plazo_entrega }}</p>
                             </article>
@@ -117,7 +118,7 @@
                 <section class="panel-card">
                     <div class="panel-heading p-4"><p class="eyebrow mb-1">AYUDA Y DATOS</p><h2 class="h4 fw-bold mb-0">Soporte centralizado</h2></div>
                     <div class="p-4"><p class="small text-secondary">Descarga una copia de tus datos o registra una consulta sobre cuenta, pedido o despacho. Los cambios sensibles se revisan antes de aplicarse.</p><div class="d-grid gap-2"><a href="{% url 'descargar_mis_datos' %}" class="btn btn-primary rounded-pill"><i class="bi bi-download me-1"></i>Descargar mis datos</a><a href="{% url 'solicitar_privacidad' %}" class="btn btn-outline-primary rounded-pill"><i class="bi bi-chat-heart me-1"></i>Crear consulta de soporte</a></div>
-                        <div class="mt-4">{% for solicitud in solicitudes %}<div class="privacy-item d-flex justify-content-between align-items-center gap-2 py-2"><div><strong class="small d-block">{{ solicitud.get_tipo_display }}</strong><small class="text-secondary">{{ solicitud.creado_en|date:"d/m/Y" }}</small></div><span class="privacy-state">{{ solicitud.get_estado_display }}</span></div>{% empty %}<p class="small text-secondary mb-0">Aún no tienes consultas registradas.</p>{% endfor %}</div>
+                        <div class="mt-4">{% for solicitud in solicitudes %}<div class="privacy-item py-3"><div class="d-flex justify-content-between align-items-center gap-2"><div><strong class="small d-block">{{ solicitud.get_tipo_display }}</strong><small class="text-secondary">{{ solicitud.creado_en|date:"d/m/Y" }} · {{ solicitud.codigo_consulta }}</small></div><span class="privacy-state">{{ solicitud.get_estado_display }}</span></div>{% if solicitud.respuesta %}<div class="support-answer small p-2 mt-2"><strong class="d-block mb-1"><i class="bi bi-chat-left-text me-1"></i>Respuesta de LogisFlow</strong>{{ solicitud.respuesta }}</div>{% endif %}</div>{% empty %}<p class="small text-secondary mb-0">Aún no tienes consultas registradas.</p>{% endfor %}</div>
                         <a href="{% url 'politica_privacidad' %}" class="btn btn-link btn-sm text-decoration-none px-0 mt-3">Leer política de privacidad <i class="bi bi-arrow-up-right ms-1"></i></a>
                     </div>
                 </section>

@@ -1,0 +1,29 @@
+<style>
+    .site-header { position: relative; z-index: 10; background: #fff; border-bottom: 1px solid #e8e1e7; box-shadow: 0 3px 14px rgba(75, 36, 64, .05); }
+    .site-header-inner { min-height: 64px; }
+    .site-header-logo { color: #b4487a; font-weight: 800; letter-spacing: .02em; }
+    .site-header-link { color: #5f6878; border: 1px solid #e1e4ea; border-radius: 999px; padding: .45rem .72rem; text-decoration: none; font-size: .82rem; font-weight: 650; }
+    .site-header-link:hover { color: #93365f; border-color: #df9ab9; background: #fff4f8; }
+    .site-header-link-primary { color: #fff; border-color: #b4487a; background: #b4487a; }
+    .site-header-link-primary:hover { color: #fff; border-color: #93365f; background: #93365f; }
+</style>
+<header class="site-header">
+    <div class="container site-header-inner d-flex flex-wrap align-items-center justify-content-between gap-2">
+        {% if header_admin_login %}
+            <a href="{% url 'catalogo' %}" class="site-header-logo text-decoration-none">LOGISFLOW <span class="small text-secondary fw-semibold">· Administración</span></a>
+            <a href="{% url 'catalogo' %}" class="site-header-link">Volver a la tienda</a>
+        {% else %}
+            <a href="{% url 'catalogo' %}" class="site-header-logo text-decoration-none">LOGISFLOW</a>
+            <nav class="d-flex flex-wrap align-items-center justify-content-end gap-2" aria-label="Navegación principal">
+                <a href="{% url 'catalogo' %}" class="site-header-link">Tienda</a>
+                <a href="{% url 'seguimiento' %}" class="site-header-link">Rastrear</a>
+                {% if user.is_authenticated and not user.is_staff %}
+                    <a href="{% url 'mi_cuenta' %}" class="site-header-link">Mi cuenta</a>
+                {% elif not user.is_authenticated %}
+                    <a href="{% url 'iniciar_sesion_cliente' %}" class="site-header-link">Iniciar sesión</a>
+                {% endif %}
+                <a href="{% url 'ver_carrito' %}" class="site-header-link site-header-link-primary">Carrito</a>
+            </nav>
+        {% endif %}
+    </div>
+</header>

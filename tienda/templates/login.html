@@ -25,13 +25,14 @@
     </style>
 </head>
 <body>
+    {% include "partials/header.html" with header_admin_login=True %}
     <main class="container login-shell p-3"><section class="card login-card"><div class="row g-0">
         <div class="col-md-6 d-none d-md-block brand-panel"><div class="brand-content h-100 d-flex flex-column justify-content-between p-5"><div><div class="brand-icon mb-4"><i class="bi bi-box-seam"></i></div><p class="eyebrow mb-2">LOGISFLOW · ADMINISTRACIÓN</p><h1 class="h2 fw-bold mb-3">Tu tienda, bajo control.</h1><p class="text-white-50 mb-0">Gestiona inventario, pagos confirmados y despachos desde un solo panel.</p></div><small class="text-white-50"><i class="bi bi-shield-check me-1"></i>Acceso restringido a administración</small></div></div>
         <div class="col-md-6"><div class="p-4 p-lg-5"><div class="d-md-none text-center mb-4"><span class="brand-icon text-white" style="background:#b4487a;"><i class="bi bi-box-seam"></i></span><p class="eyebrow text-dark mt-3 mb-1">LOGISFLOW</p></div><p class="eyebrow text-dark mb-2">BIENVENIDA</p><h2 class="h3 fw-bold mb-2">Inicia sesión</h2><p class="text-secondary small mb-4">Ingresa tus credenciales para abrir el panel administrativo.</p>
             <form method="post" action="{% url 'login' %}">{% csrf_token %}{% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
                 <div class="mb-3"><label class="form-label fw-semibold">Usuario</label><div class="input-group"><span class="input-group-text"><i class="bi bi-person"></i></span><input type="text" name="username" class="form-control" autocomplete="username" placeholder="Tu usuario" required autofocus></div></div>
                 <div class="mb-4"><label class="form-label fw-semibold">Contraseña</label><div class="input-group"><span class="input-group-text"><i class="bi bi-key"></i></span><input type="password" name="password" class="form-control" autocomplete="current-password" placeholder="••••••••" required></div></div>
-                {% if form.errors %}<div class="alert alert-danger border-0 rounded-3 small py-2"><i class="bi bi-exclamation-circle me-1"></i>Usuario o contraseña incorrectos.</div>{% endif %}
+                {% if error %}<div class="alert alert-danger border-0 rounded-3 small py-2"><i class="bi bi-exclamation-circle me-1"></i>{{ error }}</div>{% endif %}
                 <button type="submit" class="btn btn-primary login-button w-100 fw-bold">Ingresar al panel <i class="bi bi-arrow-right ms-1"></i></button>
             </form>
             <div class="text-center mt-4"><a href="{% url 'catalogo' %}" class="small text-secondary text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Volver a la tienda pública</a></div>

@@ -43,6 +43,14 @@
         .price-tag { color: var(--ink); font-size: 1.45rem; font-weight: 800; letter-spacing: -.03em; }
         .product-purchase { margin-top: 1.15rem; padding-top: 1rem; border-top: 1px solid #f0e7ec; }
         .product-button { border-radius: 12px; min-height: 44px; }
+        .card-size-picker { display: flex; flex-wrap: wrap; gap: .42rem; }
+        .card-size-option { position: relative; cursor: pointer; }
+        .card-size-option input { position: absolute; opacity: 0; pointer-events: none; }
+        .card-size-option span { display: inline-flex; align-items: center; justify-content: center; min-width: 39px; min-height: 35px; padding: .25rem .48rem; border: 1px solid #d9dfe8; border-radius: 9px; color: #4e596a; background: #fff; font-size: .78rem; font-weight: 800; transition: .18s ease; }
+        .card-size-option:hover span { border-color: #d484aa; color: var(--brand); background: #fff7fb; }
+        .card-size-option input:focus-visible + span { outline: 3px solid rgba(180,72,122,.24); outline-offset: 2px; }
+        .card-size-option input:checked + span { border-color: var(--brand); color: #fff; background: var(--brand); box-shadow: 0 4px 10px rgba(180,72,122,.2); }
+        .card-size-unavailable { display: inline-flex; align-items: center; justify-content: center; min-width: 39px; min-height: 35px; padding: .25rem .48rem; border: 1px solid #eceff3; border-radius: 9px; color: #a5adbb; background: #f7f8fa; font-size: .78rem; font-weight: 800; text-decoration: line-through; }
         .empty-state { border: 1px dashed #cad4e4; border-radius: 20px; background: rgba(255,255,255,.7); padding: 4rem 1.5rem; }
         .btn-primary { --bs-btn-bg: #b4487a; --bs-btn-border-color: #b4487a; --bs-btn-hover-bg: #93365f; --bs-btn-hover-border-color: #93365f; --bs-btn-active-bg: #7a294e; --bs-btn-active-border-color: #7a294e; }
         .text-primary { color: var(--brand) !important; }
@@ -68,7 +76,7 @@
     </nav>
 
     <main class="flex-grow-1">
-        <section class="container store-shell pt-4 pt-lg-5"><div class="hero p-4 p-md-5"><div class="hero-content"><p class="eyebrow mb-2">LOGISFLOW · MODA FEMENINA</p><h1 class="display-6 fw-bold mb-3">Prendas que combinan contigo, entrega que entiendes.</h1><p class="lead text-white-50 mb-4">Elige tu talla, revisa el stock disponible y conoce el despacho antes de pagar.</p><div class="d-flex flex-wrap gap-2"><a href="#catalogo" class="btn btn-light rounded-pill px-4 fw-bold">Ver colección <i class="bi bi-arrow-down ms-1"></i></a><a href="{% url 'politicas_despacho' %}" class="btn btn-outline-light rounded-pill px-4">Opciones de entrega</a></div></div></div></section>
+        <section class="container store-shell pt-4 pt-lg-5"><div class="hero p-4 p-md-5"><div class="hero-content"><p class="eyebrow mb-2">LOGISFLOW · MODA FEMENINA</p><h1 class="display-6 fw-bold mb-3">Prendas que combinan contigo, entrega que entiendes.</h1><p class="lead text-white-50 mb-4">Elige tu talla, revisa el stock disponible y conoce el despacho antes de pagar.</p><div class="d-flex flex-wrap gap-2"><a href="#catalogo" class="btn btn-light rounded-pill px-4 fw-bold">Ver colección <i class="bi bi-arrow-down ms-1"></i></a></div></div></div></section>
 
         <section class="container store-shell my-4"><div class="row g-3"><div class="col-md-4"><div class="service-card h-100 p-3 d-flex gap-3 align-items-center"><span class="service-icon"><i class="bi bi-box-seam"></i></span><div><strong class="d-block">Stock disponible</strong><small class="text-secondary">La talla se confirma antes de pagar.</small></div></div></div><div class="col-md-4"><div class="service-card h-100 p-3 d-flex gap-3 align-items-center"><span class="service-icon"><i class="bi bi-truck"></i></span><div><strong class="d-block">Entrega flexible</strong><small class="text-secondary">Retiro, Metro o despacho a domicilio.</small></div></div></div><div class="col-md-4"><div class="service-card h-100 p-3 d-flex gap-3 align-items-center"><span class="service-icon"><i class="bi bi-person-check"></i></span><div><strong class="d-block">Compra como prefieras</strong><small class="text-secondary">Compra como invitada o inicia sesión para administrar tus pedidos.</small></div></div></div></div></section>
 
@@ -95,7 +103,21 @@
                                 <div class="product-purchase">
                                     <div class="d-flex align-items-center justify-content-between mb-3"><span class="price-tag">${{ producto.precio }}</span><span class="small text-secondary">{{ producto.stock_total }} disponible{{ producto.stock_total|pluralize }}</span></div>
                                     {% if producto.stock_total > 0 %}
-                                        <a href="{% url 'producto_detalle' producto.id %}" class="btn btn-primary product-button w-100 fw-bold">Ver tallas y agregar <i class="bi bi-bag-plus ms-1"></i></a>
+                                        <form action="{% url 'agregar_carrito' producto.id %}" method="post">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="cantidad" value="1">
+                                            <label class="small fw-bold d-block mb-2">Elige tu talla</label>
+                                            <div class="card-size-picker mb-3" aria-label="Tallas disponibles para {{ producto.nombre }}">
+                                                {% for variante in producto.variantes.all %}
+                                                    {% if variante.stock_disponible > 0 %}
+                                                        <label class="card-size-option" title="{{ variante.talla }}: {{ variante.stock_disponible }} disponible{{ variante.stock_disponible|pluralize }}"><input type="radio" name="variante_id" value="{{ variante.id }}" required aria-label="Talla {{ variante.talla }}, {{ variante.stock_disponible }} disponibles"><span>{{ variante.talla }}</span></label>
+                                                    {% else %}
+                                                        <span class="card-size-unavailable" title="Talla {{ variante.talla }} agotada">{{ variante.talla }}</span>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                            <div class="d-grid gap-2"><button type="submit" class="btn btn-primary product-button w-100 fw-bold">Agregar al carrito <i class="bi bi-bag-plus ms-1"></i></button><a href="{% url 'producto_detalle' producto.id %}" class="btn btn-link btn-sm text-secondary text-decoration-none">Ver detalles</a></div>
+                                        </form>
                                     {% else %}
                                         <a href="{% url 'producto_detalle' producto.id %}" class="btn btn-light product-button w-100 fw-bold text-secondary">Ver tallas disponibles</a>
                                     {% endif %}
@@ -110,6 +132,6 @@
         </section>
     </main>
 
-    {% include "partials/footer.html" with mostrar_administracion=True %}
+    {% include "partials/footer.html" %}
 </body>
 </html>

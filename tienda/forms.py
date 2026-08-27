@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
-from .logistica import ESTACIONES_METRO_CHOICES, datos_estacion_metro
+from .logistica import TARIFAS_METRO_CHOICES, ESTACIONES_METRO_CHOICES, datos_estacion_metro, datos_tarifa_metro
 from .models import Cliente, Producto, SolicitudPrivacidad, VarianteProducto
 
 
@@ -85,6 +85,12 @@ class CheckoutForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={'class': 'form-select', 'id': 'selector_estacion_metro'}),
     )
+
+    tarifa_metro = forms.ChoiceField(
+        choices=[('', '--- Selecciona un horario de coordinación ---')] + TARIFAS_METRO_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'selector_tarifa_metro'}),
+    )
     
     direccion = forms.CharField(
         max_length=200, 
@@ -122,6 +128,7 @@ class CheckoutForm(forms.Form):
         tipo_entrega = cleaned_data.get('tipo_entrega')
         direccion = ' '.join((cleaned_data.get('direccion') or '').split())
         estacion_metro = cleaned_data.get('estacion_metro')
+        tarifa_metro = cleaned_data.get('tarifa_metro')
         rut = cleaned_data.get('rut')
         telefono = cleaned_data.get('telefono')
         email = cleaned_data.get('email')
@@ -145,12 +152,18 @@ class CheckoutForm(forms.Form):
         if tipo_entrega == 'Metro':
             if not estacion_metro:
                 self.add_error('estacion_metro', 'Selecciona la estación de Metro para coordinar la entrega.')
-            else:
+            if not tarifa_metro:
+                self.add_error('tarifa_metro', 'Selecciona el horario para aplicar el valor correcto del pasaje.')
+            if estacion_metro and tarifa_metro:
                 try:
                     estacion = datos_estacion_metro(estacion_metro)
-                    cleaned_data['direccion'] = f"Metro: {estacion['nombre']} ({estacion['linea']})"
+                    tarifa = datos_tarifa_metro(tarifa_metro)
+                    cleaned_data['direccion'] = (
+                        f"Metro: {estacion['nombre']} ({estacion['linea']}) · "
+                        f"{tarifa['nombre']} (${tarifa['costo']})"
+                    )
                 except ValueError as error:
-                    self.add_error('estacion_metro', str(error))
+                    self.add_error('tarifa_metro', str(error))
             return cleaned_data
 
         if tipo_entrega == 'Delivery' and not direccion:
@@ -466,3 +479,92 @@ class SoporteInvitadoForm(SolicitudPrivacidadForm):
         if not re.fullmatch(r'LF-[A-F0-9]{10}', codigo):
             raise ValidationError('Ingresa el código de seguimiento con formato LF-XXXXXXXXXX.')
         return codigo
+
+
+class ConsultaRespuestaSoporteForm(forms.Form):
+    rut = forms.CharField(
+        max_length=12,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'RUT de la compra',
+            'autocomplete': 'off',
+        }),
+    )
+    codigo_consulta = forms.CharField(
+        max_length=14,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: SUP-A1B2C3D4E5',
+            'autocomplete': 'off',
+            'autocapitalize': 'characters',
+        }),
+    )
+
+    def clean_rut(self):
+        try:
+            return normalizar_rut(self.cleaned_data.get('rut', ''))
+        except ValueError as error:
+            raise ValidationError(str(error))
+
+    def clean_codigo_consulta(self):
+        codigo = str(self.cleaned_data.get('codigo_consulta', '')).strip().upper()
+        if not re.fullmatch(r'SUP-[A-F0-9]{10}', codigo):
+            raise ValidationError('Ingresa el código de consulta con formato SUP-XXXXXXXXXX.')
+        return codigo
+
+
+class RespuestaSoporteForm(forms.Form):
+    respuesta = forms.CharField(
+        min_length=10,
+        max_length=2000,
+        error_messages={
+            'required': 'Escribe una respuesta antes de enviarla.',
+            'min_length': 'La respuesta debe tener al menos 10 caracteres.',
+        },
+        widget=forms.Textarea(attrs={
+            'class': 'form-control form-control-sm',
+            'rows': 3,
+            'placeholder': 'Escribe una respuesta clara para la clienta.',
+        }),
+    )
+
+    def clean_respuesta(self):
+        respuesta = ' '.join(self.cleaned_data.get('respuesta', '').split())
+        if len(respuesta) < 10:
+            raise ValidationError('La respuesta debe tener al menos 10 caracteres.')
+        return respuesta
+
+
+class IncidenteTecnicoForm(forms.Form):
+    asunto = forms.CharField(
+        min_length=5,
+        max_length=150,
+        error_messages={
+            'required': 'Indica un asunto para el incidente.',
+            'min_length': 'El asunto debe tener al menos 5 caracteres.',
+        },
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Mercado Pago rechaza todas las tarjetas',
+            'autocomplete': 'off',
+        }),
+    )
+    descripcion = forms.CharField(
+        min_length=15,
+        max_length=2000,
+        error_messages={
+            'required': 'Describe qué ocurre para que el equipo técnico pueda revisarlo.',
+            'min_length': 'Describe el problema con al menos 15 caracteres.',
+        },
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 7,
+            'placeholder': 'Indica desde cuándo ocurre, qué estabas haciendo y qué mensaje viste. No incluyas contraseñas, RUT, datos de tarjeta ni códigos de pago.',
+        }),
+    )
+
+    def clean_asunto(self):
+        return ' '.join(self.cleaned_data['asunto'].split())
+
+    def clean_descripcion(self):
+        return ' '.join(self.cleaned_data['descripcion'].split())

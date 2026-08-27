@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Página no encontrada · LogisFlow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root { --ink: #34233d; --brand: #b4487a; }
+        body { color: var(--ink); background: radial-gradient(circle at 10% 15%, #fbddea 0, transparent 25rem), radial-gradient(circle at 92% 86%, #e8d8fb 0, transparent 28rem), #fcf7fa; }
+        .not-found-card { max-width: 650px; border: 0; border-radius: 28px; box-shadow: 0 24px 60px rgba(75, 36, 64, .16); background: rgba(255, 255, 255, .94); }
+        .not-found-icon { width: 92px; height: 92px; display: inline-flex; align-items: center; justify-content: center; border-radius: 28px; color: var(--brand); background: #fff0f6; font-size: 2.7rem; }
+        .error-code { color: var(--brand); font-size: .78rem; font-weight: 800; letter-spacing: .14em; }
+        .btn-primary { --bs-btn-bg: #b4487a; --bs-btn-border-color: #b4487a; --bs-btn-hover-bg: #93365f; --bs-btn-hover-border-color: #93365f; }
+    </style>
+</head>
+<body>
+    {% include "partials/header.html" %}
+    <main class="container d-flex flex-grow-1 align-items-center justify-content-center py-5">
+        <section class="card not-found-card text-center w-100 p-4 p-md-5">
+            <div class="not-found-icon mx-auto mb-4"><i class="bi bi-map"></i></div>
+            <p class="error-code mb-2">ERROR 404</p>
+            <h1 class="display-6 fw-bold mb-3">Parece que te perdiste</h1>
+            <p class="text-secondary mx-auto mb-4" style="max-width: 470px;">La página que buscas no existe, cambió de dirección o no está disponible. Volvamos a la colección para que sigas explorando.</p>
+            <a href="{% url 'catalogo' %}" class="btn btn-primary rounded-pill px-4 py-3 fw-bold"><i class="bi bi-bag-heart me-2"></i>Volver al catálogo</a>
+        </section>
+    </main>
+    {% include "partials/footer.html" %}
+</body>
+</html>

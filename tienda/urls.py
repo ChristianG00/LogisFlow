@@ -1,5 +1,4 @@
 from django.urls import path
-from django.contrib.auth import views as auth_views
 from . import views
 from recomendador.views import motor_recomendacion
 
@@ -37,18 +36,15 @@ urlpatterns = [
     path('politica-de-privacidad/', views.politica_privacidad, name='politica_privacidad'),
     path('webhook/', views.webhook_mercadopago, name='webhook_mercadopago'),
     
-    # Administración
-    path('dashboard/', views.dashboard, name='dashboard'),
-    path('dashboard/pedido/actualizar/', views.actualizar_estado_pedido, name='actualizar_estado_pedido'),
-    path('dashboard/privacidad/<int:solicitud_id>/resolver/', views.resolver_solicitud_privacidad, name='resolver_solicitud_privacidad'),
-    path('dashboard/producto/guardar/', views.guardar_producto, name='guardar_producto'),
-    path('dashboard/producto/eliminar/<int:producto_id>/', views.eliminar_producto, name='eliminar_producto'),
-    path('dashboard/producto/talla/guardar/', views.guardar_talla, name='guardar_talla'),
-    
-    # Exportación
-    path('dashboard/exportar/', views.exportar_excel, name='exportar_excel'), 
-    
-    # Sesión administrativa
-    path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    # Administración interna: un único acceso privado para la dueña
+    path('administracion-interna-8b741e/', views.iniciar_sesion_administracion, name='login'),
+    path('administracion-interna-8b741e/panel/', views.dashboard, name='dashboard'),
+    path('administracion-interna-8b741e/panel/pedido/actualizar/', views.actualizar_estado_pedido, name='actualizar_estado_pedido'),
+    path('administracion-interna-8b741e/panel/soporte/<int:solicitud_id>/responder/', views.responder_solicitud_soporte, name='responder_solicitud_soporte'),
+    path('administracion-interna-8b741e/panel/incidente-tecnico/', views.reportar_incidente_tecnico, name='reportar_incidente_tecnico'),
+    path('administracion-interna-8b741e/panel/producto/guardar/', views.guardar_producto, name='guardar_producto'),
+    path('administracion-interna-8b741e/panel/producto/eliminar/<int:producto_id>/', views.eliminar_producto, name='eliminar_producto'),
+    path('administracion-interna-8b741e/panel/producto/talla/guardar/', views.guardar_talla, name='guardar_talla'),
+    path('administracion-interna-8b741e/panel/exportar/', views.exportar_excel, name='exportar_excel'),
+    path('administracion-interna-8b741e/salir/', views.cerrar_sesion_cliente, name='logout'),
 ]
