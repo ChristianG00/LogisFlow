@@ -64,9 +64,11 @@
             <form class="search-box flex-grow-1 order-3 order-md-2 mt-2 mt-md-0" method="get" action="{% url 'catalogo' %}"><div class="input-group"><input type="search" class="form-control rounded-start-pill ps-3" name="q" placeholder="Busca prendas, estilos o colores" value="{{ query|default:'' }}" aria-label="Buscar productos"><button class="btn btn-dark rounded-end-pill px-3" type="submit" aria-label="Buscar"><i class="bi bi-search"></i></button></div></form>
             <div class="d-flex align-items-center gap-2 ms-md-auto order-2 order-md-3">
                 <a href="{% url 'recomendador' %}" class="btn btn-warning btn-sm rounded-pill px-3 fw-bold"><i class="bi bi-stars me-1"></i><span class="d-none d-lg-inline">Armar outfit</span></a>
-                {% if user.is_authenticated and not user.is_staff %}
+                {% if user.is_staff %}
+                    <a href="{% url 'dashboard' %}" class="btn btn-dark btn-sm rounded-pill px-3"><i class="bi bi-speedometer2 me-1"></i><span class="d-none d-lg-inline">Volver al panel</span></a>
+                {% elif user.is_authenticated %}
                     <a href="{% url 'mi_cuenta' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3"><i class="bi bi-person-heart me-1"></i>Mi cuenta</a>
-                {% elif not user.is_authenticated %}
+                {% else %}
                     <a href="{% url 'iniciar_sesion_cliente' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3"><i class="bi bi-person me-1"></i>Iniciar sesión</a>
                 {% endif %}
                 <a href="{% url 'seguimiento' %}" class="btn btn-light btn-sm rounded-pill px-3 border d-none d-sm-inline-block"><i class="bi bi-truck me-1"></i>Rastrear</a>

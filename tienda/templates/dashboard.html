@@ -71,8 +71,7 @@
             <a class="navbar-brand fw-bold" href="#"><i class="bi bi-shield-lock me-2"></i>Admin LogisFlow</a>
             <div class="d-flex align-items-center gap-2">
                 <button type="button" class="btn btn-danger btn-sm panic-button" data-bs-toggle="offcanvas" data-bs-target="#soporteTecnico" aria-controls="soporteTecnico"><i class="bi bi-exclamation-octagon-fill me-1"></i>Soporte técnico <span class="d-none d-lg-inline">(Contactar a desarrolladores)</span></button>
-                <a href="{% url 'catalogo' %}" class="btn btn-outline-light btn-sm me-2" target="_blank">Ir a la
-                    Tienda</a>
+                <a href="{% url 'catalogo' %}" class="btn btn-outline-light btn-sm me-2"><i class="bi bi-shop me-1"></i>Ver tienda</a>
                 <form action="{% url 'logout' %}" method="post" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-box-arrow-right"></i>

@@ -36,15 +36,15 @@ urlpatterns = [
     path('politica-de-privacidad/', views.politica_privacidad, name='politica_privacidad'),
     path('webhook/', views.webhook_mercadopago, name='webhook_mercadopago'),
     
-    # Administración interna: un único acceso privado para la dueña
-    path('administracion-interna-8b741e/', views.iniciar_sesion_administracion, name='login'),
-    path('administracion-interna-8b741e/panel/', views.dashboard, name='dashboard'),
-    path('administracion-interna-8b741e/panel/pedido/actualizar/', views.actualizar_estado_pedido, name='actualizar_estado_pedido'),
-    path('administracion-interna-8b741e/panel/soporte/<int:solicitud_id>/responder/', views.responder_solicitud_soporte, name='responder_solicitud_soporte'),
-    path('administracion-interna-8b741e/panel/incidente-tecnico/', views.reportar_incidente_tecnico, name='reportar_incidente_tecnico'),
-    path('administracion-interna-8b741e/panel/producto/guardar/', views.guardar_producto, name='guardar_producto'),
-    path('administracion-interna-8b741e/panel/producto/eliminar/<int:producto_id>/', views.eliminar_producto, name='eliminar_producto'),
-    path('administracion-interna-8b741e/panel/producto/talla/guardar/', views.guardar_talla, name='guardar_talla'),
-    path('administracion-interna-8b741e/panel/exportar/', views.exportar_excel, name='exportar_excel'),
-    path('administracion-interna-8b741e/salir/', views.cerrar_sesion_cliente, name='logout'),
+    # Administración interna: acceso directo para la dueña, sin enlace público
+    path('gestion-logisflow/', views.iniciar_sesion_administracion, name='login'),
+    path('gestion-logisflow/panel/', views.dashboard, name='dashboard'),
+    path('gestion-logisflow/panel/pedido/actualizar/', views.actualizar_estado_pedido, name='actualizar_estado_pedido'),
+    path('gestion-logisflow/panel/soporte/<int:solicitud_id>/responder/', views.responder_solicitud_soporte, name='responder_solicitud_soporte'),
+    path('gestion-logisflow/panel/incidente-tecnico/', views.reportar_incidente_tecnico, name='reportar_incidente_tecnico'),
+    path('gestion-logisflow/panel/producto/guardar/', views.guardar_producto, name='guardar_producto'),
+    path('gestion-logisflow/panel/producto/eliminar/<int:producto_id>/', views.eliminar_producto, name='eliminar_producto'),
+    path('gestion-logisflow/panel/producto/talla/guardar/', views.guardar_talla, name='guardar_talla'),
+    path('gestion-logisflow/panel/exportar/', views.exportar_excel, name='exportar_excel'),
+    path('gestion-logisflow/salir/', views.cerrar_sesion_cliente, name='logout'),
 ]
