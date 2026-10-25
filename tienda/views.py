@@ -1,4 +1,6 @@
 import csv
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -6,9 +8,11 @@ import re
 import secrets
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+from io import BytesIO
 from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from xml.sax.saxutils import escape
 
 import mercadopago
 from django.conf import settings
@@ -197,6 +201,100 @@ def _enviar_verificacion_correo_cliente(request, cliente):
         recipient_list=[cliente.email],
         fail_silently=False,
     )
+
+
+def _enviar_confirmacion_pedido(pedido_id):
+    # Envía el comprobante solo después de confirmar el pedido
+    try:
+        pedido = (
+            Pedido.objects.select_related('cliente', 'pago')
+            .prefetch_related('detallepedido_set__variante__producto')
+            .get(pk=pedido_id)
+        )
+    except Pedido.DoesNotExist:
+        logger.warning('No se encontró el pedido %s para enviar su confirmación.', pedido_id)
+        return
+
+    correo = (pedido.cliente.email or '').strip()
+    if not correo:
+        logger.info('El pedido %s no tiene correo para enviar confirmación.', pedido_id)
+        return
+
+    lineas_productos = []
+    for detalle in pedido.detallepedido_set.all():
+        if detalle.variante_id:
+            lineas_productos.append(
+                f'- {detalle.variante.producto.nombre} · talla {detalle.variante.talla} '
+                f'· {detalle.cantidad} unidad(es) · ${detalle.precio_unitario * detalle.cantidad}'
+            )
+
+    flete = (
+        'Flete Starken: por pagar al recibir el despacho.'
+        if pedido.tipo_entrega == 'Delivery' and not pedido.costo_despacho
+        else f'Despacho: ${pedido.costo_despacho}.' if pedido.costo_despacho
+        else 'Despacho: sin cargo.'
+    )
+    mensaje = (
+        f'Hola {pedido.cliente.nombre},\n\n'
+        'Tu pago fue aprobado y tu pedido quedó confirmado en LogisFlow.\n\n'
+        f'Código de seguimiento: {pedido.codigo_seguimiento}\n'
+        f'Modalidad de entrega: {pedido.get_tipo_entrega_display()}\n'
+        f'Plazo estimado: {pedido.plazo_entrega}\n'
+        f'{flete}\n'
+        f'Total pagado hoy: ${pedido.pago.total}\n\n'
+        'Productos:\n'
+        f'{chr(10).join(lineas_productos) or "Sin detalle disponible."}\n\n'
+        f'Seguimiento: {pedido.mecanismo_seguimiento}\n\n'
+        'Guarda el código de seguimiento. Para consultar tu pedido en la tienda '
+        'necesitarás ese código junto con el RUT usado en la compra.\n\n'
+        'Equipo LogisFlow'
+    )
+    try:
+        send_mail(
+            subject=f'LogisFlow · Pedido confirmado {pedido.codigo_seguimiento}',
+            message=mensaje,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[correo],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception('No fue posible enviar la confirmación del pedido %s.', pedido.pk)
+
+
+def _firma_webhook_mercadopago_valida(request):
+    # Comprueba que la notificación fue firmada por Mercado Pago
+    secreto = os.getenv('MP_WEBHOOK_SECRET', '').strip()
+    firma = request.headers.get('x-signature', '')
+    request_id = request.headers.get('x-request-id', '')
+    data_id = request.GET.get('data.id', '')
+    if not secreto or not firma:
+        logger.error('Webhook de Mercado Pago rechazado por falta de firma o secreto configurado.')
+        return False
+
+    partes = {}
+    for segmento in firma.split(','):
+        clave, separador, valor = segmento.strip().partition('=')
+        if separador and clave.strip().lower() in {'ts', 'v1'}:
+            partes[clave.strip().lower()] = valor.strip()
+
+    timestamp = partes.get('ts', '')
+    firma_recibida = partes.get('v1', '')
+    if not timestamp or not firma_recibida:
+        logger.warning('Webhook de Mercado Pago rechazado por formato de firma inválido.')
+        return False
+
+    manifest = ''
+    if data_id:
+        manifest += f'id:{data_id};'
+    if request_id:
+        manifest += f'request-id:{request_id};'
+    manifest += f'ts:{timestamp};'
+    firma_esperada = hmac.new(
+        secreto.encode('utf-8'),
+        manifest.encode('utf-8'),
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(firma_esperada, firma_recibida)
 
 
 def _mostrar_acceso_cliente(
@@ -447,6 +545,9 @@ def _crear_pago_con_reserva(form, items, subtotal, entrega):
             telefono=form.cleaned_data['telefono'],
             direccion=form.cleaned_data['direccion'],
             tipo_entrega=form.cleaned_data['tipo_entrega'],
+            guardar_direccion_predeterminada=form.cleaned_data.get(
+                'guardar_direccion_predeterminada', False,
+            ),
             items=items,
             subtotal_productos=subtotal,
             costo_despacho=entrega['costo'],
@@ -570,21 +671,28 @@ def _confirmar_pago(payment_id, referencia):
         ):
             raise PagoNoConfirmado('El total del detalle no coincide con el pago.')
 
+        direccion_inicial = pago.direccion if pago.tipo_entrega == 'Delivery' else ''
         cliente, creado = Cliente.objects.get_or_create(
             rut=pago.rut,
             defaults={
                 'nombre': pago.nombre,
                 'email': pago.email,
                 'telefono': pago.telefono,
-                'direccion': pago.direccion,
+                'direccion': direccion_inicial,
             },
         )
         if not creado:
             cliente.nombre = pago.nombre
             cliente.email = pago.email
             cliente.telefono = pago.telefono
-            cliente.direccion = pago.direccion
-            cliente.save(update_fields=['nombre', 'email', 'telefono', 'direccion'])
+            campos_actualizados = ['nombre', 'email', 'telefono']
+            if (
+                pago.tipo_entrega == 'Delivery'
+                and pago.guardar_direccion_predeterminada
+            ):
+                cliente.direccion = pago.direccion
+                campos_actualizados.append('direccion')
+            cliente.save(update_fields=campos_actualizados)
             if cliente.usuario_id and cliente.usuario.email != pago.email:
                 cliente.usuario.email = pago.email
                 cliente.usuario.save(update_fields=['email'])
@@ -614,6 +722,9 @@ def _confirmar_pago(payment_id, referencia):
         pago.save(update_fields=[
             'estado', 'mercadopago_payment_id', 'pedido', 'reserva_activa', 'reserva_expira_en',
         ])
+        transaction.on_commit(
+            lambda pedido_id=pedido.id: _enviar_confirmacion_pedido(pedido_id)
+        )
         return pedido
 
 
@@ -921,7 +1032,7 @@ def actualizar_direccion_cliente(request):
     form = DireccionClienteForm(request.POST, instance=cliente)
     if form.is_valid():
         form.save()
-        messages.success(request, 'Tu dirección registrada fue actualizada.')
+        messages.success(request, 'Tu dirección predeterminada para despacho fue actualizada.')
         return redirect('mi_cuenta')
 
     messages.error(request, 'No se actualizó la dirección. Revisa el dato indicado.')
@@ -936,11 +1047,7 @@ def actualizar_direccion_cliente(request):
     }, status=400)
 
 
-@login_required(login_url='iniciar_sesion_cliente')
-def descargar_mis_datos(request):
-    cliente = _perfil_cliente(request)
-    if not cliente:
-        return HttpResponseForbidden('Esta sesión no corresponde a una cuenta de cliente.')
+def _datos_exportables_cliente(cliente):
     pedidos = Pedido.objects.filter(cliente=cliente).prefetch_related(
         'detallepedido_set__variante__producto',
     ).order_by('-fecha')
@@ -957,13 +1064,146 @@ def descargar_mis_datos(request):
                 })
         datos_pedidos.append({
             'codigo_seguimiento': pedido.codigo_seguimiento,
-            'fecha': pedido.fecha.isoformat(),
+            'fecha': pedido.fecha,
             'estado': pedido.estado,
-            'tipo_entrega': pedido.tipo_entrega,
+            'tipo_entrega': pedido.get_tipo_entrega_display(),
             'costo_despacho': pedido.costo_despacho,
             'plazo_entrega': pedido.plazo_entrega,
             'productos': productos,
         })
+    return datos_pedidos
+
+
+@login_required(login_url='iniciar_sesion_cliente')
+def descargar_resumen_mis_datos(request):
+    cliente = _perfil_cliente(request)
+    if not cliente:
+        return HttpResponseForbidden('Esta sesión no corresponde a una cuenta de cliente.')
+    datos_pedidos = _datos_exportables_cliente(cliente)
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_LEFT
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import cm
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except ImportError:
+        logger.exception('No está disponible la dependencia para generar el resumen PDF.')
+        return HttpResponse(
+            'El resumen PDF no está disponible en este momento. Inténtalo más tarde.',
+            status=503,
+        )
+
+    buffer = BytesIO()
+    documento = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=1.7 * cm,
+        leftMargin=1.7 * cm,
+        topMargin=1.7 * cm,
+        bottomMargin=1.7 * cm,
+        title='Resumen de datos personales - LogisFlow',
+    )
+    estilos = getSampleStyleSheet()
+    estilos.add(ParagraphStyle(
+        name='LogisFlowTitulo',
+        parent=estilos['Title'],
+        textColor=colors.HexColor('#B4487A'),
+        fontName='Helvetica-Bold',
+        fontSize=20,
+        leading=24,
+        alignment=TA_LEFT,
+        spaceAfter=4,
+    ))
+    estilos.add(ParagraphStyle(
+        name='LogisFlowSeccion',
+        parent=estilos['Heading2'],
+        textColor=colors.HexColor('#34233D'),
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=16,
+        spaceBefore=16,
+        spaceAfter=8,
+    ))
+    estilos.add(ParagraphStyle(
+        name='LogisFlowTexto',
+        parent=estilos['BodyText'],
+        fontName='Helvetica',
+        fontSize=9,
+        leading=13,
+        textColor=colors.HexColor('#39313D'),
+    ))
+
+    historia = [
+        Paragraph('LogisFlow', estilos['LogisFlowTitulo']),
+        Paragraph('Resumen de datos personales', estilos['Heading2']),
+        Paragraph(
+            f'Generado el {timezone.localtime().strftime("%d/%m/%Y a las %H:%M")}. '
+            'Este documento reúne los datos asociados a tu cuenta y tus pedidos. '
+            'No contiene contraseñas ni datos de tarjetas.',
+            estilos['LogisFlowTexto'],
+        ),
+        Spacer(1, 0.35 * cm),
+        Paragraph('Datos de la cuenta', estilos['LogisFlowSeccion']),
+    ]
+    filas_perfil = [
+        ['Nombre', cliente.nombre],
+        ['RUT', cliente.rut],
+        ['Correo', cliente.email or 'No registrado'],
+        ['Teléfono', cliente.telefono or 'No registrado'],
+        ['Dirección predeterminada para despacho', cliente.direccion or 'No definida'],
+    ]
+    tabla_perfil = Table(filas_perfil, colWidths=[5.7 * cm, 11.0 * cm])
+    tabla_perfil.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F8EAF0')),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#34233D')),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('LEADING', (0, 0), (-1, -1), 12),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#E1D6DD')),
+        ('LEFTPADDING', (0, 0), (-1, -1), 7),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 7),
+        ('TOPPADDING', (0, 0), (-1, -1), 7),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+    ]))
+    historia.append(tabla_perfil)
+    historia.append(Paragraph('Pedidos registrados', estilos['LogisFlowSeccion']))
+    if not datos_pedidos:
+        historia.append(Paragraph('No existen pedidos confirmados asociados a esta cuenta.', estilos['LogisFlowTexto']))
+    for pedido in datos_pedidos:
+        productos = '<br/>'.join(
+            f"{escape(str(item['producto']))} · talla {escape(str(item['talla']))} · {item['cantidad']} un."
+            for item in pedido['productos']
+        ) or 'Sin productos registrados'
+        historia.extend([
+            Paragraph(
+                f"<b>{escape(str(pedido['codigo_seguimiento']))}</b> · "
+                f"{pedido['fecha'].strftime('%d/%m/%Y')} · {escape(str(pedido['estado']))}",
+                estilos['LogisFlowTexto'],
+            ),
+            Paragraph(
+                f"Entrega: {escape(str(pedido['tipo_entrega']))} · "
+                f"Plazo: {escape(str(pedido['plazo_entrega']))}<br/>"
+                f"Productos: {productos}",
+                estilos['LogisFlowTexto'],
+            ),
+            Spacer(1, 0.2 * cm),
+        ])
+
+    documento.build(historia)
+    respuesta = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    respuesta['Content-Disposition'] = 'attachment; filename="resumen-mis-datos-logisflow.pdf"'
+    return respuesta
+
+
+@login_required(login_url='iniciar_sesion_cliente')
+def descargar_mis_datos(request):
+    cliente = _perfil_cliente(request)
+    if not cliente:
+        return HttpResponseForbidden('Esta sesión no corresponde a una cuenta de cliente.')
+    datos_pedidos = _datos_exportables_cliente(cliente)
     respuesta = HttpResponse(
         json.dumps({
             'perfil': {
@@ -973,7 +1213,13 @@ def descargar_mis_datos(request):
                 'telefono': cliente.telefono,
                 'direccion': cliente.direccion,
             },
-            'pedidos': datos_pedidos,
+            'pedidos': [
+                {
+                    **pedido,
+                    'fecha': pedido['fecha'].isoformat(),
+                }
+                for pedido in datos_pedidos
+            ],
         }, ensure_ascii=False, indent=2),
         content_type='application/json; charset=utf-8',
     )
@@ -988,11 +1234,10 @@ def solicitar_privacidad(request):
         return HttpResponseForbidden('Esta sesión no corresponde a una cuenta de cliente.')
     es_invitada = cliente is None
     tipo_solicitado = request.GET.get('tipo', '')
-    tipos_disponibles = (
-        [codigo for codigo, _ in SolicitudPrivacidad.TIPOS_SOPORTE]
-        if not es_invitada else [codigo for codigo, _ in SoporteInvitadoForm.base_fields['tipo'].choices]
-    )
     formulario_clase = SoporteInvitadoForm if es_invitada else SolicitudPrivacidadForm
+    tipos_disponibles = [
+        codigo for codigo, _ in formulario_clase.base_fields['tipo'].choices
+    ]
     form = formulario_clase(
         request.POST or None,
         initial={'tipo': tipo_solicitado} if tipo_solicitado in tipos_disponibles else None,
@@ -1093,6 +1338,79 @@ def agregar_carrito(request, producto_id):
         'imagen_url': producto.imagen.url if producto.imagen else '',
     }
     _guardar_carrito(request, carrito, reiniciar_expiracion=True)
+    return redirect('ver_carrito')
+
+
+@require_POST
+def agregar_outfit_carrito(request):
+    # Agrega el outfit completo sin reemplazar lo que ya existe en el carrito
+    try:
+        variantes_ids = [int(valor) for valor in request.POST.getlist('variante_id')]
+    except (TypeError, ValueError):
+        return HttpResponseBadRequest('El outfit recomendado contiene tallas inválidas.')
+
+    if len(variantes_ids) != 2 or len(set(variantes_ids)) != 2 or any(valor < 1 for valor in variantes_ids):
+        return HttpResponseBadRequest('El outfit recomendado debe contener dos prendas distintas.')
+
+    filtros_recomendador = request.POST.get('filtros_recomendador', '')
+    destino_recomendador = reverse('recomendador')
+    if filtros_recomendador:
+        destino_recomendador = f'{destino_recomendador}?{filtros_recomendador}'
+
+    variantes_encontradas = VarianteProducto.objects.select_related('producto').filter(id__in=variantes_ids)
+    variantes_por_id = {variante.id: variante for variante in variantes_encontradas}
+    if len(variantes_por_id) != len(variantes_ids):
+        return HttpResponseBadRequest('Una prenda recomendada ya no está disponible.')
+    variantes = [variantes_por_id[variante_id] for variante_id in variantes_ids]
+
+    carrito_original, carrito_expirado, _ = _obtener_carrito_vigente(request)
+    if carrito_original:
+        try:
+            carrito, _, _ = _normalizar_carrito(carrito_original)
+        except CarritoInvalido:
+            return HttpResponseBadRequest(
+                'El carrito contiene datos inválidos. Revisa sus productos antes de agregar el outfit.'
+            )
+    else:
+        carrito = {}
+
+    sin_stock = []
+    for variante in variantes:
+        item_id = f'{variante.producto_id}_{variante.id}'
+        cantidad_existente = carrito.get(item_id, {}).get('cantidad', 0)
+        if cantidad_existente + 1 > variante.stock_disponible:
+            sin_stock.append(f'{variante.producto.nombre} en talla {variante.talla}')
+    if sin_stock:
+        messages.error(
+            request,
+            f"No agregamos el outfit porque ya no hay stock suficiente de {', '.join(sin_stock)}.",
+        )
+        return redirect(destino_recomendador)
+
+    for variante in variantes:
+        producto = variante.producto
+        item_id = f'{producto.id}_{variante.id}'
+        cantidad_existente = carrito.get(item_id, {}).get('cantidad', 0)
+        carrito[item_id] = {
+            'producto_id': producto.id,
+            'variante_id': variante.id,
+            'nombre': producto.nombre,
+            'talla': variante.talla,
+            'precio': producto.precio,
+            'cantidad': cantidad_existente + 1,
+            'imagen_url': producto.imagen.url if producto.imagen else '',
+        }
+
+    try:
+        carrito, _, _ = _normalizar_carrito(carrito)
+    except CarritoInvalido as error:
+        messages.error(request, f'No agregamos el outfit: {error}')
+        return redirect(destino_recomendador)
+
+    _guardar_carrito(request, carrito, reiniciar_expiracion=True)
+    if carrito_expirado:
+        messages.info(request, 'Tu carrito anterior había vencido. Agregamos este outfit a un nuevo carrito.')
+    messages.success(request, 'Agregamos las dos prendas recomendadas a tu carrito.')
     return redirect('ver_carrito')
 
 
@@ -1604,6 +1922,8 @@ def exportar_excel(request):
 @csrf_exempt
 @require_POST
 def webhook_mercadopago(request):
+    if not _firma_webhook_mercadopago_valida(request):
+        return HttpResponse(status=401)
     payment_id = _extraer_id_pago(request)
     if not payment_id:
         return HttpResponse(status=200)

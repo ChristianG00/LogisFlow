@@ -11,11 +11,12 @@
         .shell { max-width:720px; } .card-reset { border:0; border-radius:26px; box-shadow:0 20px 54px rgba(75,36,64,.14); } .brand { color:var(--brand); }
         .icon-circle { width:58px; height:58px; display:grid; place-items:center; border-radius:50%; color:#fff; background:linear-gradient(145deg,#7c3f69,#b4487a); font-size:1.45rem; }
         .form-control { min-height:48px; border-radius:11px; border-color:#dcdde6; } .form-control:focus { border-color:#d67da7; box-shadow:0 0 0 .2rem rgba(180,72,122,.13); }
+        .password-toggle { min-width:48px; color:#8e3c66; border-color:#dcdde6; background:#fff7fa; } .password-toggle:hover { color:#fff; border-color:var(--brand); background:var(--brand); }
         .btn-primary { --bs-btn-bg:#b4487a; --bs-btn-border-color:#b4487a; --bs-btn-hover-bg:#93365f; --bs-btn-hover-border-color:#93365f; }
     </style>
 </head>
 <body class="d-flex flex-column">
-    {% include "partials/header.html" %}
+    {% include "partials/header.html" with header_auth=True %}
     <main class="container shell flex-grow-1 d-flex align-items-center py-4 py-lg-5">
         <section class="card card-reset w-100"><div class="card-body p-4 p-md-5">
             <div class="icon-circle mb-4"><i class="bi bi-key"></i></div>
@@ -25,8 +26,8 @@
                 <p class="small fw-bold brand mb-2">NUEVA CONTRASEÑA</p><h1 class="h3 fw-bold mb-2">Crea una contraseña segura</h1><p class="text-secondary small mb-4">Usa al menos 10 caracteres y evita datos fáciles de adivinar. Al guardarla, el enlace no podrá volver a usarse.</p>
                 <form method="post" novalidate>{% csrf_token %}
                     {% if form.non_field_errors %}<div class="alert alert-danger rounded-3 small">{{ form.non_field_errors }}</div>{% endif %}
-                    <div class="mb-3"><label class="form-label fw-semibold" for="{{ form.password1.id_for_label }}">Nueva contraseña</label>{{ form.password1 }}{% if form.password1.errors %}<div class="text-danger small mt-1">{{ form.password1.errors|striptags }}</div>{% endif %}</div>
-                    <div class="mb-4"><label class="form-label fw-semibold" for="{{ form.password2.id_for_label }}">Repite la nueva contraseña</label>{{ form.password2 }}{% if form.password2.errors %}<div class="text-danger small mt-1">{{ form.password2.errors|striptags }}</div>{% endif %}</div>
+                    <div class="mb-3"><label class="form-label fw-semibold" for="{{ form.password1.id_for_label }}">Nueva contraseña</label><div class="input-group">{{ form.password1 }}<button class="btn password-toggle" type="button" data-password-toggle data-password-target="{{ form.password1.id_for_label }}" aria-label="Mostrar contraseña" title="Mostrar contraseña"><i class="bi bi-eye"></i></button></div>{% if form.password1.errors %}<div class="text-danger small mt-1">{{ form.password1.errors|striptags }}</div>{% endif %}</div>
+                    <div class="mb-4"><label class="form-label fw-semibold" for="{{ form.password2.id_for_label }}">Repite la nueva contraseña</label><div class="input-group">{{ form.password2 }}<button class="btn password-toggle" type="button" data-password-toggle data-password-target="{{ form.password2.id_for_label }}" aria-label="Mostrar contraseña" title="Mostrar contraseña"><i class="bi bi-eye"></i></button></div>{% if form.password2.errors %}<div class="text-danger small mt-1">{{ form.password2.errors|striptags }}</div>{% endif %}</div>
                     <button class="btn btn-primary w-100 fw-bold py-3" type="submit">Guardar nueva contraseña <i class="bi bi-check2 ms-1"></i></button>
                 </form>
             {% endif %}
@@ -34,5 +35,21 @@
         </div></section>
     </main>
     {% include "partials/footer.html" %}
+    <script>
+        document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+            const input = document.getElementById(button.dataset.passwordTarget);
+            const icon = button.querySelector('i');
+            if (!input || !icon) return;
+            button.addEventListener('click', () => {
+                const ocultar = input.type === 'text';
+                input.type = ocultar ? 'password' : 'text';
+                icon.classList.toggle('bi-eye', ocultar);
+                icon.classList.toggle('bi-eye-slash', !ocultar);
+                const texto = ocultar ? 'Mostrar contraseña' : 'Ocultar contraseña';
+                button.setAttribute('aria-label', texto);
+                button.setAttribute('title', texto);
+            });
+        });
+    </script>
 </body>
 </html>

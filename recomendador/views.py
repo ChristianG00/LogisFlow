@@ -35,7 +35,8 @@ CATEGORIAS_INFERIORES = {'INFERIOR', 'PANTALONES', 'FALDAS'}
 def _puntuar_outfit(arriba, abajo, presupuesto, estilo, temporada):
     # Ordena las combinaciones según las preferencias y el stock
     puntaje = 20
-    razones = ['Dentro de tu presupuesto']
+    # Todas las combinaciones ya pasan el filtro de disponibilidad por talla
+    razones = ['Stock disponible', 'Dentro de tu presupuesto']
 
     coincidencias_estilo = 0
     coincidencias_temporada = 0
@@ -80,7 +81,6 @@ def _puntuar_outfit(arriba, abajo, presupuesto, estilo, temporada):
     stock_minimo = min(arriba.stock_recomendado, abajo.stock_recomendado)
     if stock_minimo >= 3:
         puntaje += 5
-        razones.append('Stock disponible')
 
     return puntaje, razones, stock_minimo
 
@@ -102,8 +102,10 @@ def _productos_disponibles(talla, presupuesto):
     for producto in productos:
         # El stock depende de la talla elegida
         if producto.variantes_recomendadas:
-            producto.stock_recomendado = producto.variantes_recomendadas[0].stock_disponible
+            variante_recomendada = producto.variantes_recomendadas[0]
+            producto.stock_recomendado = variante_recomendada.stock_disponible
             producto.talla_recomendada = talla
+            producto.variante_recomendada_id = variante_recomendada.id
             disponibles.append(producto)
     return disponibles
 
@@ -169,4 +171,5 @@ def motor_recomendacion(request):
         'form': form,
         'combos': combos_sugeridos,
         'error': error,
+        'filtros_recomendador': request.GET.urlencode(),
     })

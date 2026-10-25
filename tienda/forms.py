@@ -98,6 +98,15 @@ class CheckoutForm(forms.Form):
         widget=forms.TextInput(attrs={'class': 'form-control', 'id': 'campo_direccion', 'placeholder': 'Ej: Estación Tobalaba o Calle Falsa 123'})
     )
 
+    guardar_direccion_predeterminada = forms.BooleanField(
+        required=False,
+        label='Guardar esta dirección para futuros despachos',
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+            'id': 'guardar_direccion_predeterminada',
+        }),
+    )
+
     aceptar_terminos = forms.BooleanField(
         required=True,
         label="Acepto los Términos y condiciones de compra.",
@@ -146,10 +155,12 @@ class CheckoutForm(forms.Form):
 
         # El servidor decide la dirección según la entrega elegida
         if tipo_entrega == 'Retiro':
+            cleaned_data['guardar_direccion_predeterminada'] = False
             cleaned_data['direccion'] = 'Retiro en domicilio (La Granja)'
             return cleaned_data
 
         if tipo_entrega == 'Metro':
+            cleaned_data['guardar_direccion_predeterminada'] = False
             if not estacion_metro:
                 self.add_error('estacion_metro', 'Selecciona la estación de Metro para coordinar la entrega.')
             if not tarifa_metro:
@@ -426,7 +437,7 @@ class DireccionClienteForm(forms.ModelForm):
 
 class SolicitudPrivacidadForm(forms.Form):
     tipo = forms.ChoiceField(
-        choices=SolicitudPrivacidad.TIPOS_SOPORTE,
+        choices=SolicitudPrivacidad.TIPOS_SOPORTE + SolicitudPrivacidad.TIPOS,
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
     detalle = forms.CharField(
@@ -464,7 +475,10 @@ class SoporteInvitadoForm(SolicitudPrivacidadForm):
         }),
     )
     tipo = forms.ChoiceField(
-        choices=[opcion for opcion in SolicitudPrivacidad.TIPOS_SOPORTE if opcion[0] != 'CUENTA'],
+        choices=(
+            [opcion for opcion in SolicitudPrivacidad.TIPOS_SOPORTE if opcion[0] != 'CUENTA']
+            + SolicitudPrivacidad.TIPOS
+        ),
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
 

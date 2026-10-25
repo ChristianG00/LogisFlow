@@ -226,6 +226,7 @@ class PagoPendiente(models.Model):
     telefono = models.CharField(max_length=20)
     direccion = models.CharField(max_length=200)
     tipo_entrega = models.CharField(max_length=50)
+    guardar_direccion_predeterminada = models.BooleanField(default=False)
     items = models.JSONField()
     total = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     subtotal_productos = models.PositiveIntegerField(default=0)

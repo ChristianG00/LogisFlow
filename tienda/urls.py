@@ -16,6 +16,7 @@ urlpatterns = [
     path('cuenta/salir/', views.cerrar_sesion_cliente, name='cerrar_sesion_cliente'),
     path('mi-cuenta/', views.mi_cuenta, name='mi_cuenta'),
     path('mi-cuenta/direccion/', views.actualizar_direccion_cliente, name='actualizar_direccion_cliente'),
+    path('mi-cuenta/resumen-datos/', views.descargar_resumen_mis_datos, name='descargar_resumen_mis_datos'),
     path('mi-cuenta/mis-datos/', views.descargar_mis_datos, name='descargar_mis_datos'),
     path('mi-cuenta/privacidad/', views.solicitar_privacidad, name='solicitar_privacidad'),
     
@@ -23,6 +24,7 @@ urlpatterns = [
     # Carrito
     path('carrito/', views.ver_carrito, name='ver_carrito'),
     path('carrito/agregar/<int:producto_id>/', views.agregar_carrito, name='agregar_carrito'),
+    path('carrito/agregar-outfit/', views.agregar_outfit_carrito, name='agregar_outfit_carrito'),
     path('carrito/sumar/<str:item_id>/', views.sumar_carrito, name='sumar_carrito'),
     path('carrito/restar/<str:item_id>/', views.restar_carrito, name='restar_carrito'),
     path('carrito/eliminar/<str:item_id>/', views.eliminar_del_carrito, name='eliminar_del_carrito'),

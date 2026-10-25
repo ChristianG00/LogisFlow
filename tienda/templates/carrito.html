@@ -32,6 +32,7 @@
         .summary-card::before { content: ''; display: block; height: 5px; background: linear-gradient(90deg, #f4a6c4, #c58ae5); }
         .summary-card .muted { color: var(--muted); }
         .cart-expiry { border: 1px solid rgba(123,229,194,.32); background: rgba(65,216,171,.09); border-radius: 14px; }
+        .cart-timer-value { color: #087f5b; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
         .pay-button { min-height: 56px; border-radius: 14px; box-shadow: 0 10px 20px rgba(36,107,253,.25); }
         .step-list { display: flex; gap: .5rem; align-items: center; color: #8591a5; font-size: .78rem; font-weight: 700; }
         .step-list .active { color: var(--brand); }
@@ -96,7 +97,7 @@
 
             <div class="col-lg-4">
                 <aside class="summary-card sticky-top" style="top: 20px;"><div class="p-4 p-lg-5"><p class="eyebrow mb-1">RESUMEN</p><h2 class="h4 fw-bold mb-4">Tu compra</h2>
-                    {% if carrito_expira_en_timestamp %}<div class="cart-expiry p-3 mb-4"><div class="d-flex gap-2"><i class="bi bi-bag-check-fill text-success mt-1"></i><small class="muted">Tu carrito se conserva <strong class="text-dark">{{ carrito_duracion_minutos }} minutos desde el último cambio</strong>. Puedes seguir mirando con tranquilidad.</small></div></div>{% endif %}
+                    {% if carrito_expira_en_timestamp %}<div id="cart-timer" class="cart-expiry p-3 mb-4" data-expira-en="{{ carrito_expira_en_timestamp }}"><div class="d-flex justify-content-between align-items-center gap-2"><small class="muted"><i class="bi bi-clock-history text-success me-1"></i>Tiempo restante de tu carrito</small><strong class="cart-timer-value" data-timer-value>--:--</strong></div><small class="muted d-block mt-2">El tiempo se reinicia al cambiar productos. El stock se reserva al continuar al pago.</small></div>{% endif %}
                     <div class="d-flex justify-content-between small muted mb-2"><span>Productos ({{ carrito|length }})</span><span>${{ total }}</span></div>
                     <div class="d-flex justify-content-between align-items-end border-top border-secondary pt-3 mt-3 mb-3"><span class="fs-5">Subtotal</span><strong class="fs-2 text-success">${{ total }}</strong></div>
                     <p class="small muted mb-4"><i class="bi bi-truck me-1"></i> El despacho, plazo y total final se informan antes de pagar.</p>
@@ -106,5 +107,23 @@
         </div>
     </main>
     {% include "partials/footer.html" %}
+    <script>
+        (() => {
+            const timer = document.getElementById('cart-timer');
+            if (!timer) return;
+            const destino = Number(timer.dataset.expiraEn) * 1000;
+            const valor = timer.querySelector('[data-timer-value]');
+            const salida = '{% url "ver_carrito" %}';
+            const actualizarTemporizador = () => {
+                const restante = Math.max(0, Math.ceil((destino - Date.now()) / 1000));
+                const minutos = String(Math.floor(restante / 60)).padStart(2, '0');
+                const segundos = String(restante % 60).padStart(2, '0');
+                valor.textContent = `${minutos}:${segundos}`;
+                if (restante <= 0) window.location.assign(salida);
+            };
+            actualizarTemporizador();
+            window.setInterval(actualizarTemporizador, 1000);
+        })();
+    </script>
 </body>
 </html>

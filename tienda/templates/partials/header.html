@@ -12,6 +12,8 @@
         {% if header_admin_login %}
             <a href="{% url 'catalogo' %}" class="site-header-logo text-decoration-none">LOGISFLOW <span class="small text-secondary fw-semibold">· Administración</span></a>
             <a href="{% url 'catalogo' %}" class="site-header-link">Volver a la tienda</a>
+        {% elif header_auth %}
+            <a href="{% url 'catalogo' %}" class="site-header-logo text-decoration-none">LOGISFLOW</a>
         {% else %}
             <a href="{% url 'catalogo' %}" class="site-header-logo text-decoration-none">LOGISFLOW</a>
             <nav class="d-flex flex-wrap align-items-center justify-content-end gap-2" aria-label="Navegación principal">
